@@ -1,11 +1,11 @@
 package org.studyplatform.courseservice.dto.publicapi;
 
-import org.studyplatform.courseservice.entity.enums.TaskType;
+import org.studyplatform.courseservice.entity.enums.CourseItemType;
 
-public record TaskSummaryResponse(
+public record CourseItemSummaryResponse(
         Long id,
         String title,
-        TaskType taskType,
+        CourseItemType itemType,
         String language,
         Integer orderIndex
 ) {
