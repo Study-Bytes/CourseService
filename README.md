@@ -121,6 +121,61 @@ PUT /api/v1/admin/course-items/{itemId}/options
 
 These endpoints replace the whole child collection for a course item. This is simpler for an MVP course editor: the frontend/BFF sends the current list as the source of truth.
 
+
+
+## Internal API
+
+Internal endpoints are intended for trusted backend services, primarily `LearningService`.
+They expose data that must never be returned through public student-facing endpoints.
+
+Current MVP protection uses a static header:
+
+```http
+X-Internal-Api-Key: <internal-api-key>
+```
+
+Configured in `application.properties`:
+
+```properties
+app.internal-api-key=dev-course-service-internal-key
+```
+
+### Execution package
+
+```http
+GET /api/v1/internal/course-items/{itemId}/execution-package
+```
+
+This endpoint returns the full execution package for a course item:
+
+- course/item identifiers;
+- item type and language;
+- starter code;
+- execution limits;
+- execution policy;
+- evaluation policy;
+- all tests, including hidden tests;
+- expected outputs.
+
+This endpoint is for `LearningService` only. It is used when a student runs or submits a solution.
+`CodeExecutorService` still does not compare answers; it only executes code and returns technical output.
+`LearningService` should compare executor output with the expected outputs from this package.
+
+### Course availability
+
+```http
+GET /api/v1/internal/courses/{courseId}/availability
+```
+
+This endpoint returns publication/access/enrollment state for a course. `LearningService` can use it before creating enrollment records.
+
+Public endpoints must continue to hide:
+
+- hidden tests;
+- expected output;
+- correct quiz answers;
+- quiz explanations.
+
 ## Swagger/OpenAPI
 
 Runtime docs:
@@ -226,6 +281,14 @@ irm http://localhost:8082/api/v1/admin/course-items/1
 
 PowerShell does not support raw `GET http://...` syntax. Use `irm` or Postman.
 
+
+Check internal API:
+
+```powershell
+irm http://localhost:8082/api/v1/internal/course-items/2/execution-package -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
+irm http://localhost:8082/api/v1/internal/courses/1/availability -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
+```
+
 ## Integration notes
 
 ### Site
@@ -265,7 +328,6 @@ CodeExecutorService should not call CourseService directly in the normal flow. L
 
 ## Next planned tasks
 
-- Implement internal execution package API for LearningService.
 - Implement CourseService security checks.
 - Add broader integration tests for public/admin/internal APIs.
 - Prepare deployment configuration.
