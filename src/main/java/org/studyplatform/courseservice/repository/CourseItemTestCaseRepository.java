@@ -8,10 +8,10 @@ import java.util.List;
 
 public interface CourseItemTestCaseRepository extends JpaRepository<CourseItemTestCase, Long> {
 
-    List<CourseItemTestCase> findByTaskIdOrderByOrderIndexAsc(Long taskId);
+    List<CourseItemTestCase> findByItemIdOrderByOrderIndexAsc(Long itemId);
 
-    List<CourseItemTestCase> findByTaskIdAndVisibilityOrderByOrderIndexAsc(
-            Long taskId,
+    List<CourseItemTestCase> findByItemIdAndVisibilityOrderByOrderIndexAsc(
+            Long itemId,
             TestVisibility visibility
     );
 }

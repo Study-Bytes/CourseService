@@ -1,6 +1,6 @@
 package org.studyplatform.courseservice.dto.publicapi;
 
-public record TaskHintResponse(
+public record CourseItemHintResponse(
         Integer orderIndex,
         String text
 ) {

@@ -3,19 +3,19 @@ package org.studyplatform.courseservice.mapper;
 import org.springframework.stereotype.Component;
 import org.studyplatform.courseservice.dto.publicapi.CourseCatalogItemResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseDetailsResponse;
+import org.studyplatform.courseservice.dto.publicapi.CourseItemDetailsResponse;
+import org.studyplatform.courseservice.dto.publicapi.CourseItemHintResponse;
+import org.studyplatform.courseservice.dto.publicapi.CourseItemLimitsResponse;
+import org.studyplatform.courseservice.dto.publicapi.CourseItemSummaryResponse;
 import org.studyplatform.courseservice.dto.publicapi.EvaluationPolicyResponse;
 import org.studyplatform.courseservice.dto.publicapi.ExecutionPolicyResponse;
 import org.studyplatform.courseservice.dto.publicapi.ModuleSummaryResponse;
 import org.studyplatform.courseservice.dto.publicapi.OpenTestCaseResponse;
-import org.studyplatform.courseservice.dto.publicapi.TaskDetailsResponse;
-import org.studyplatform.courseservice.dto.publicapi.TaskHintResponse;
-import org.studyplatform.courseservice.dto.publicapi.TaskLimitsResponse;
-import org.studyplatform.courseservice.dto.publicapi.TaskSummaryResponse;
 import org.studyplatform.courseservice.entity.Course;
+import org.studyplatform.courseservice.entity.CourseItem;
+import org.studyplatform.courseservice.entity.CourseItemHint;
+import org.studyplatform.courseservice.entity.CourseItemTestCase;
 import org.studyplatform.courseservice.entity.CourseModule;
-import org.studyplatform.courseservice.entity.CourseTask;
-import org.studyplatform.courseservice.entity.TaskHint;
-import org.studyplatform.courseservice.entity.TaskTestCase;
 import org.studyplatform.courseservice.entity.enums.TestVisibility;
 
 import java.util.Comparator;
@@ -40,14 +40,14 @@ public class PublicCourseMapper {
     public CourseDetailsResponse toCourseDetails(
             Course course,
             List<CourseModule> modules,
-            List<CourseTask> tasks
+            List<CourseItem> items
     ) {
         List<ModuleSummaryResponse> moduleResponses = modules.stream()
                 .sorted(Comparator.comparing(CourseModule::getOrderIndex))
                 .map(module -> toModuleSummary(
                         module,
-                        tasks.stream()
-                                .filter(task -> task.getModule().getId().equals(module.getId()))
+                        items.stream()
+                                .filter(item -> item.getModule().getId().equals(module.getId()))
                                 .toList()
                 ))
                 .toList();
@@ -69,11 +69,11 @@ public class PublicCourseMapper {
 
     public ModuleSummaryResponse toModuleSummary(
             CourseModule module,
-            List<CourseTask> tasks
+            List<CourseItem> items
     ) {
-        List<TaskSummaryResponse> taskResponses = tasks.stream()
-                .sorted(Comparator.comparing(CourseTask::getOrderIndex))
-                .map(this::toTaskSummary)
+        List<CourseItemSummaryResponse> itemResponses = items.stream()
+                .sorted(Comparator.comparing(CourseItem::getOrderIndex))
+                .map(this::toItemSummary)
                 .toList();
 
         return new ModuleSummaryResponse(
@@ -81,77 +81,77 @@ public class PublicCourseMapper {
                 module.getTitle(),
                 module.getDescription(),
                 module.getOrderIndex(),
-                taskResponses
+                itemResponses
         );
     }
 
-    public TaskSummaryResponse toTaskSummary(CourseTask task) {
-        return new TaskSummaryResponse(
-                task.getId(),
-                task.getTitle(),
-                task.getTaskType(),
-                task.getLanguage(),
-                task.getOrderIndex()
+    public CourseItemSummaryResponse toItemSummary(CourseItem item) {
+        return new CourseItemSummaryResponse(
+                item.getId(),
+                item.getTitle(),
+                item.getItemType(),
+                item.getLanguage(),
+                item.getOrderIndex()
         );
     }
 
-    public TaskDetailsResponse toTaskDetails(
-            CourseTask task,
-            List<TaskTestCase> testCases,
-            List<TaskHint> hints
+    public CourseItemDetailsResponse toItemDetails(
+            CourseItem item,
+            List<CourseItemTestCase> testCases,
+            List<CourseItemHint> hints
     ) {
         List<OpenTestCaseResponse> openTests = testCases.stream()
                 .filter(testCase -> testCase.getVisibility() == TestVisibility.OPEN)
-                .sorted(Comparator.comparing(TaskTestCase::getOrderIndex))
+                .sorted(Comparator.comparing(CourseItemTestCase::getOrderIndex))
                 .map(this::toOpenTestCase)
                 .toList();
 
-        List<TaskHintResponse> hintResponses = hints.stream()
-                .sorted(Comparator.comparing(TaskHint::getOrderIndex))
-                .map(this::toTaskHint)
+        List<CourseItemHintResponse> hintResponses = hints.stream()
+                .sorted(Comparator.comparing(CourseItemHint::getOrderIndex))
+                .map(this::toItemHint)
                 .toList();
 
-        return new TaskDetailsResponse(
-                task.getId(),
-                task.getModule().getId(),
-                task.getTitle(),
-                task.getTaskType(),
-                task.getStatement(),
-                task.getStarterCode(),
-                task.getLanguage(),
-                task.getOrderIndex(),
-                toTaskLimits(task),
-                toExecutionPolicy(task),
-                toEvaluationPolicy(task),
+        return new CourseItemDetailsResponse(
+                item.getId(),
+                item.getModule().getId(),
+                item.getTitle(),
+                item.getItemType(),
+                item.getStatement(),
+                item.getStarterCode(),
+                item.getLanguage(),
+                item.getOrderIndex(),
+                toItemLimits(item),
+                toExecutionPolicy(item),
+                toEvaluationPolicy(item),
                 openTests,
                 hintResponses
         );
     }
 
-    public TaskLimitsResponse toTaskLimits(CourseTask task) {
-        return new TaskLimitsResponse(
-                task.getTimeLimitMs(),
-                task.getMemoryLimitMb(),
-                task.getOutputLimitKb()
+    public CourseItemLimitsResponse toItemLimits(CourseItem item) {
+        return new CourseItemLimitsResponse(
+                item.getTimeLimitMs(),
+                item.getMemoryLimitMb(),
+                item.getOutputLimitKb()
         );
     }
 
-    public ExecutionPolicyResponse toExecutionPolicy(CourseTask task) {
+    public ExecutionPolicyResponse toExecutionPolicy(CourseItem item) {
         return new ExecutionPolicyResponse(
-                task.getNetworkDisabled(),
-                task.getReadOnlyFs()
+                item.getNetworkDisabled(),
+                item.getReadOnlyFs()
         );
     }
 
-    public EvaluationPolicyResponse toEvaluationPolicy(CourseTask task) {
+    public EvaluationPolicyResponse toEvaluationPolicy(CourseItem item) {
         return new EvaluationPolicyResponse(
-                task.getComparisonMode(),
-                task.getNormalizeLineEndings(),
-                task.getTrimTrailingWhitespaces()
+                item.getComparisonMode(),
+                item.getNormalizeLineEndings(),
+                item.getTrimTrailingWhitespaces()
         );
     }
 
-    public OpenTestCaseResponse toOpenTestCase(TaskTestCase testCase) {
+    public OpenTestCaseResponse toOpenTestCase(CourseItemTestCase testCase) {
         return new OpenTestCaseResponse(
                 testCase.getTestKey(),
                 testCase.getOrderIndex(),
@@ -159,8 +159,8 @@ public class PublicCourseMapper {
         );
     }
 
-    public TaskHintResponse toTaskHint(TaskHint hint) {
-        return new TaskHintResponse(
+    public CourseItemHintResponse toItemHint(CourseItemHint hint) {
+        return new CourseItemHintResponse(
                 hint.getOrderIndex(),
                 hint.getText()
         );

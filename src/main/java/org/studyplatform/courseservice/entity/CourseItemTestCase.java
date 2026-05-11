@@ -24,17 +24,17 @@ import org.studyplatform.courseservice.entity.enums.TestVisibility;
 @Table(
         name = "course_item_test_cases",
         indexes = {
-                @Index(name = "idx_course_item_test_cases_task_id", columnList = "task_id"),
+                @Index(name = "idx_course_item_test_cases_item_id", columnList = "item_id"),
                 @Index(name = "idx_course_item_test_cases_visibility", columnList = "visibility")
         },
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_course_item_test_cases_task_key",
-                        columnNames = {"task_id", "test_key"}
+                        name = "uk_course_item_test_cases_item_key",
+                        columnNames = {"item_id", "test_key"}
                 ),
                 @UniqueConstraint(
-                        name = "uk_course_item_test_cases_task_order",
-                        columnNames = {"task_id", "order_index"}
+                        name = "uk_course_item_test_cases_item_order",
+                        columnNames = {"item_id", "order_index"}
                 )
         }
 )
@@ -50,8 +50,8 @@ public class CourseItemTestCase {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "task_id", nullable = false)
-    private CourseItem task;
+    @JoinColumn(name = "item_id", nullable = false)
+    private CourseItem item;
 
     @Column(name = "test_key", nullable = false, length = 120)
     private String testKey;

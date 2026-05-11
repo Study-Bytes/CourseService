@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface CourseItemHintRepository extends JpaRepository<CourseItemHint, Long> {
 
-    List<CourseItemHint> findByTaskIdOrderByOrderIndexAsc(Long taskId);
+    List<CourseItemHint> findByItemIdOrderByOrderIndexAsc(Long itemId);
 }

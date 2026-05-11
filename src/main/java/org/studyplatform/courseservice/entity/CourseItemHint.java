@@ -21,12 +21,12 @@ import lombok.Setter;
 @Table(
         name = "course_item_hints",
         indexes = {
-                @Index(name = "idx_course_item_hints_task_id", columnList = "task_id")
+                @Index(name = "idx_course_item_hints_item_id", columnList = "item_id")
         },
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_course_item_hints_task_order",
-                        columnNames = {"task_id", "order_index"}
+                        name = "uk_course_item_hints_item_order",
+                        columnNames = {"item_id", "order_index"}
                 )
         }
 )
@@ -42,8 +42,8 @@ public class CourseItemHint {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "task_id", nullable = false)
-    private CourseItem task;
+    @JoinColumn(name = "item_id", nullable = false)
+    private CourseItem item;
 
     @Column(name = "order_index", nullable = false)
     private Integer orderIndex;

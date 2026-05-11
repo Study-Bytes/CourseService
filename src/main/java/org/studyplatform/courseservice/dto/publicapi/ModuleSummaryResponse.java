@@ -7,6 +7,6 @@ public record ModuleSummaryResponse(
         String title,
         String description,
         Integer orderIndex,
-        List<TaskSummaryResponse> tasks
+        List<CourseItemSummaryResponse> items
 ) {
 }

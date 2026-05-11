@@ -1,23 +1,22 @@
 package org.studyplatform.courseservice.dto.publicapi;
 
-import org.studyplatform.courseservice.entity.enums.ComparisonMode;
-import org.studyplatform.courseservice.entity.enums.TaskType;
+import org.studyplatform.courseservice.entity.enums.CourseItemType;
 
 import java.util.List;
 
-public record TaskDetailsResponse(
+public record CourseItemDetailsResponse(
         Long id,
         Long moduleId,
         String title,
-        TaskType taskType,
+        CourseItemType itemType,
         String statement,
         String starterCode,
         String language,
         Integer orderIndex,
-        TaskLimitsResponse limits,
+        CourseItemLimitsResponse limits,
         ExecutionPolicyResponse executionPolicy,
         EvaluationPolicyResponse evaluationPolicy,
         List<OpenTestCaseResponse> openTests,
-        List<TaskHintResponse> hints
+        List<CourseItemHintResponse> hints
 ) {
 }

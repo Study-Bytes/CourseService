@@ -57,8 +57,8 @@ public class CourseItem {
     private String title;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "task_type", nullable = false, length = 32)
-    private CourseItemType taskType;
+    @Column(name = "item_type", nullable = false, length = 32)
+    private CourseItemType itemType;
 
     @Column(name = "statement", columnDefinition = "TEXT")
     private String statement;
@@ -115,8 +115,8 @@ public class CourseItem {
             updatedAt = now;
         }
 
-        if (taskType == null) {
-            taskType = CourseItemType.CODING;
+        if (itemType == null) {
+            itemType = CourseItemType.CODING;
         }
 
         if (language == null || language.isBlank()) {

@@ -1,6 +1,6 @@
 package org.studyplatform.courseservice.dto.publicapi;
 
-public record TaskLimitsResponse(
+public record CourseItemLimitsResponse(
         Integer timeLimitMs,
         Integer memoryLimitMb,
         Integer outputLimitKb
