@@ -15,6 +15,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.studyplatform.courseservice.entity.enums.CourseAccessType;
 import org.studyplatform.courseservice.entity.enums.CourseDifficulty;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
 
@@ -53,6 +54,13 @@ public class Course {
     @Column(name = "status", nullable = false, length = 32)
     private CourseStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_type", nullable = false, length = 32)
+    private CourseAccessType accessType;
+
+    @Column(name = "enrollment_enabled", nullable = false)
+    private Boolean enrollmentEnabled;
+
     @Column(name = "cover_image_url", length = 1000)
     private String coverImageUrl;
 
@@ -89,6 +97,14 @@ public class Course {
 
         if (difficulty == null) {
             difficulty = CourseDifficulty.BEGINNER;
+        }
+
+        if (accessType == null) {
+            accessType = CourseAccessType.PUBLIC;
+        }
+
+        if (enrollmentEnabled == null) {
+            enrollmentEnabled = true;
         }
     }
 

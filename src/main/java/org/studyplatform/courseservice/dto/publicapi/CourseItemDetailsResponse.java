@@ -16,7 +16,9 @@ public record CourseItemDetailsResponse(
         CourseItemLimitsResponse limits,
         ExecutionPolicyResponse executionPolicy,
         EvaluationPolicyResponse evaluationPolicy,
+        List<ContentBlockResponse> contentBlocks,
         List<OpenTestCaseResponse> openTests,
-        List<CourseItemHintResponse> hints
+        List<CourseItemHintResponse> hints,
+        List<CourseItemOptionResponse> options
 ) {
 }
