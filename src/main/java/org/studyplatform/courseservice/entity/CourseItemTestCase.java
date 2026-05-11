@@ -22,18 +22,18 @@ import org.studyplatform.courseservice.entity.enums.TestVisibility;
 
 @Entity
 @Table(
-        name = "task_test_cases",
+        name = "course_item_test_cases",
         indexes = {
-                @Index(name = "idx_task_test_cases_task_id", columnList = "task_id"),
-                @Index(name = "idx_task_test_cases_visibility", columnList = "visibility")
+                @Index(name = "idx_course_item_test_cases_task_id", columnList = "task_id"),
+                @Index(name = "idx_course_item_test_cases_visibility", columnList = "visibility")
         },
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_task_test_cases_task_key",
+                        name = "uk_course_item_test_cases_task_key",
                         columnNames = {"task_id", "test_key"}
                 ),
                 @UniqueConstraint(
-                        name = "uk_task_test_cases_task_order",
+                        name = "uk_course_item_test_cases_task_order",
                         columnNames = {"task_id", "order_index"}
                 )
         }
@@ -43,7 +43,7 @@ import org.studyplatform.courseservice.entity.enums.TestVisibility;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TaskTestCase {
+public class CourseItemTestCase {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,7 +51,7 @@ public class TaskTestCase {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "task_id", nullable = false)
-    private CourseTask task;
+    private CourseItem task;
 
     @Column(name = "test_key", nullable = false, length = 120)
     private String testKey;

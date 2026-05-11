@@ -19,13 +19,13 @@ import lombok.Setter;
 
 @Entity
 @Table(
-        name = "task_hints",
+        name = "course_item_hints",
         indexes = {
-                @Index(name = "idx_task_hints_task_id", columnList = "task_id")
+                @Index(name = "idx_course_item_hints_task_id", columnList = "task_id")
         },
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_task_hints_task_order",
+                        name = "uk_course_item_hints_task_order",
                         columnNames = {"task_id", "order_index"}
                 )
         }
@@ -35,7 +35,7 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TaskHint {
+public class CourseItemHint {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,7 +43,7 @@ public class TaskHint {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "task_id", nullable = false)
-    private CourseTask task;
+    private CourseItem task;
 
     @Column(name = "order_index", nullable = false)
     private Integer orderIndex;

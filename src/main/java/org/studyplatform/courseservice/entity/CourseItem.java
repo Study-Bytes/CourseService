@@ -21,19 +21,19 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.studyplatform.courseservice.entity.enums.ComparisonMode;
-import org.studyplatform.courseservice.entity.enums.TaskType;
+import org.studyplatform.courseservice.entity.enums.CourseItemType;
 
 import java.time.Instant;
 
 @Entity
 @Table(
-        name = "course_tasks",
+        name = "course_items",
         indexes = {
-                @Index(name = "idx_course_tasks_module_id", columnList = "module_id")
+                @Index(name = "idx_course_items_module_id", columnList = "module_id")
         },
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_course_tasks_module_order",
+                        name = "uk_course_items_module_order",
                         columnNames = {"module_id", "order_index"}
                 )
         }
@@ -43,7 +43,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseTask {
+public class CourseItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,7 +58,7 @@ public class CourseTask {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "task_type", nullable = false, length = 32)
-    private TaskType taskType;
+    private CourseItemType taskType;
 
     @Column(name = "statement", columnDefinition = "TEXT")
     private String statement;
@@ -116,7 +116,7 @@ public class CourseTask {
         }
 
         if (taskType == null) {
-            taskType = TaskType.CODING;
+            taskType = CourseItemType.CODING;
         }
 
         if (language == null || language.isBlank()) {
