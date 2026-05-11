@@ -1,6 +1,6 @@
 package org.studyplatform.courseservice.entity.enums;
 
-public enum TaskType {
+public enum CourseItemType {
     CODING,
     SQL,
     QUIZ,
