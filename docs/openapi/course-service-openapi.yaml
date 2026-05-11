@@ -1,0 +1,420 @@
+openapi: 3.1.0
+info:
+  title: CourseService API
+  description: "Public read API for course catalog, course details and course item\
+    \ details. Admin and internal APIs will be documented in later tasks."
+  contact:
+    name: Study Platform
+  license:
+    name: Internal educational project
+  version: 0.1.0
+servers:
+- url: http://localhost:8082
+  description: Local development server
+tags:
+- name: Public courses
+  description: Public read endpoints for published courses and course items
+- name: System
+  description: Technical health and readiness checks
+paths:
+  /ready:
+    get:
+      tags:
+      - System
+      summary: Readiness check
+      description: Returns service readiness status.
+      operationId: ready
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /health:
+    get:
+      tags:
+      - System
+      summary: Health check
+      description: Returns service health status.
+      operationId: health
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/v1/courses:
+    get:
+      tags:
+      - Public courses
+      summary: Get published course catalog
+      description: "Returns published public courses only. Private, archived and draft\
+        \ courses are not included."
+      operationId: getPublishedCourseCatalog
+      responses:
+        "200":
+          description: Published public course catalog
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CourseCatalogResponse"
+  /api/v1/courses/{courseId}:
+    get:
+      tags:
+      - Public courses
+      summary: Get published course details
+      description: Returns course details with modules and course item summaries.
+        Only published PUBLIC or UNLISTED courses are readable.
+      operationId: getPublishedCourseDetails
+      parameters:
+      - name: courseId
+        in: path
+        description: Course identifier
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1
+      responses:
+        "200":
+          description: Published course details
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CourseDetailsResponse"
+        "404":
+          description: Course not found or not publicly readable
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/course-items/{itemId}:
+    get:
+      tags:
+      - Public courses
+      summary: Get published course item details
+      description: "Returns course item content blocks, open tests, hints and public\
+        \ quiz options. Hidden tests, expected outputs and correct quiz answers are\
+        \ not exposed."
+      operationId: getPublishedCourseItemDetails
+      parameters:
+      - name: itemId
+        in: path
+        description: Course item identifier
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1
+      responses:
+        "200":
+          description: Published course item details
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CourseItemDetailsResponse"
+        "404":
+          description: Course item not found or not publicly readable
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+components:
+  schemas:
+    CourseCatalogItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+        title:
+          type: string
+        shortDescription:
+          type: string
+        difficulty:
+          type: string
+          enum:
+          - BEGINNER
+          - INTERMEDIATE
+          - ADVANCED
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        accessType:
+          type: string
+          enum:
+          - PUBLIC
+          - UNLISTED
+          - PRIVATE
+        enrollmentEnabled:
+          type: boolean
+        coverImageUrl:
+          type: string
+        estimatedMinutes:
+          type: integer
+          format: int32
+    CourseCatalogResponse:
+      type: object
+      properties:
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseCatalogItemResponse"
+    ApiErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+    CourseDetailsResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+        title:
+          type: string
+        shortDescription:
+          type: string
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum:
+          - BEGINNER
+          - INTERMEDIATE
+          - ADVANCED
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        accessType:
+          type: string
+          enum:
+          - PUBLIC
+          - UNLISTED
+          - PRIVATE
+        enrollmentEnabled:
+          type: boolean
+        coverImageUrl:
+          type: string
+        estimatedMinutes:
+          type: integer
+          format: int32
+        publishedAt:
+          type: string
+          format: date-time
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleSummaryResponse"
+    CourseItemSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        language:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+    ModuleSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseItemSummaryResponse"
+    ContentBlockResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        blockType:
+          type: string
+          enum:
+          - TEXT
+          - VIDEO
+          - IMAGE
+          - CODE
+          - EMBED
+          - FILE
+        orderIndex:
+          type: integer
+          format: int32
+        title:
+          type: string
+        textContent:
+          type: string
+        url:
+          type: string
+        language:
+          type: string
+        metadataJson:
+          type: string
+    CourseItemDetailsResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        moduleId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        statement:
+          type: string
+        starterCode:
+          type: string
+        language:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        limits:
+          $ref: "#/components/schemas/CourseItemLimitsResponse"
+        executionPolicy:
+          $ref: "#/components/schemas/ExecutionPolicyResponse"
+        evaluationPolicy:
+          $ref: "#/components/schemas/EvaluationPolicyResponse"
+        contentBlocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentBlockResponse"
+        openTests:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenTestCaseResponse"
+        hints:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseItemHintResponse"
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseItemOptionResponse"
+    CourseItemHintResponse:
+      type: object
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        text:
+          type: string
+    CourseItemLimitsResponse:
+      type: object
+      properties:
+        timeLimitMs:
+          type: integer
+          format: int32
+        memoryLimitMb:
+          type: integer
+          format: int32
+        outputLimitKb:
+          type: integer
+          format: int32
+    CourseItemOptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderIndex:
+          type: integer
+          format: int32
+        label:
+          type: string
+        text:
+          type: string
+    EvaluationPolicyResponse:
+      type: object
+      properties:
+        comparisonMode:
+          type: string
+          enum:
+          - EXACT
+        normalizeLineEndings:
+          type: boolean
+        trimTrailingWhitespaces:
+          type: boolean
+    ExecutionPolicyResponse:
+      type: object
+      properties:
+        networkDisabled:
+          type: boolean
+        readOnlyFs:
+          type: boolean
+    OpenTestCaseResponse:
+      type: object
+      properties:
+        testKey:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        inputData:
+          type: string
+  securitySchemes:
+    internalApiKey:
+      type: apiKey
+      name: X-Internal-Api-Key
+      in: header
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
