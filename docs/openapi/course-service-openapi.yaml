@@ -1,22 +1,403 @@
 openapi: 3.1.0
 info:
   title: CourseService API
-  description: "Public read API for course catalog, course details and course item\
-    \ details. Admin and internal APIs will be documented in later tasks."
-  contact:
-    name: Study Platform
-  license:
-    name: Internal educational project
-  version: 0.1.0
+  description: Course content and structure service API.
+  version: v1
 servers:
 - url: http://localhost:8082
-  description: Local development server
+  description: Generated server url
 tags:
 - name: Public courses
   description: Public read endpoints for published courses and course items
 - name: System
   description: Technical health and readiness checks
+- name: Internal Course API
+  description: Trusted backend endpoints for LearningService and BFF integrations
+- name: Admin Course API
+  description: Teacher/admin API for creating and editing course content
 paths:
+  /api/v1/admin/modules/{moduleId}:
+    put:
+      tags:
+      - Admin Course API
+      summary: Update module
+      description: Updates module metadata and order.
+      operationId: updateModule
+      parameters:
+      - name: moduleId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateModuleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminModuleResponse"
+    delete:
+      tags:
+      - Admin Course API
+      summary: Delete module
+      description: Deletes a module and all its course items.
+      operationId: deleteModule
+      parameters:
+      - name: moduleId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: No Content
+  /api/v1/admin/courses/{courseId}:
+    get:
+      tags:
+      - Admin Course API
+      summary: Get admin course details
+      description: Returns course metadata with modules and item summaries.
+      operationId: getCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+    put:
+      tags:
+      - Admin Course API
+      summary: Update course
+      description: Updates course metadata.
+      operationId: updateCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourseRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+  /api/v1/admin/course-items/{itemId}:
+    get:
+      tags:
+      - Admin Course API
+      summary: Get admin course item details
+      description: "Returns course item with content blocks, hints, tests and quiz\
+        \ options."
+      operationId: getItem
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseItemResponse"
+    put:
+      tags:
+      - Admin Course API
+      summary: Update course item
+      description: Updates base metadata and execution/evaluation settings for a course
+        item.
+      operationId: updateItem
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourseItemRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseItemResponse"
+    delete:
+      tags:
+      - Admin Course API
+      summary: Delete course item
+      description: "Deletes a course item and its content blocks, hints, tests and\
+        \ quiz options."
+      operationId: deleteItem
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: No Content
+  /api/v1/admin/course-items/{itemId}/test-cases:
+    put:
+      tags:
+      - Admin Course API
+      summary: Replace test cases
+      description: Replaces all test cases for a course item. Admin response includes
+        expected output.
+      operationId: replaceTestCases
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceTestCasesRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseItemResponse"
+  /api/v1/admin/course-items/{itemId}/options:
+    put:
+      tags:
+      - Admin Course API
+      summary: Replace quiz options
+      description: Replaces all quiz options for a course item. Admin response includes
+        correct flags.
+      operationId: replaceOptions
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceQuizOptionsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseItemResponse"
+  /api/v1/admin/course-items/{itemId}/hints:
+    put:
+      tags:
+      - Admin Course API
+      summary: Replace hints
+      description: Replaces all hints for a course item.
+      operationId: replaceHints
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceHintsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseItemResponse"
+  /api/v1/admin/course-items/{itemId}/content-blocks:
+    put:
+      tags:
+      - Admin Course API
+      summary: Replace content blocks
+      description: Replaces all rich content blocks for a course item.
+      operationId: replaceContentBlocks
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceContentBlocksRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseItemResponse"
+  /api/v1/admin/modules/{moduleId}/items:
+    post:
+      tags:
+      - Admin Course API
+      summary: Create course item
+      description: Creates a course item inside a module.
+      operationId: createItem
+      parameters:
+      - name: moduleId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourseItemRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseItemResponse"
+  /api/v1/admin/courses:
+    post:
+      tags:
+      - Admin Course API
+      summary: Create course
+      description: Creates a draft course with base metadata.
+      operationId: createCourse
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourseRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+  /api/v1/admin/courses/{courseId}/publish:
+    post:
+      tags:
+      - Admin Course API
+      summary: Publish course
+      description: Marks a course as published and sets publishedAt if missing.
+      operationId: publishCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+  /api/v1/admin/courses/{courseId}/modules:
+    post:
+      tags:
+      - Admin Course API
+      summary: Create module
+      description: Creates a module inside a course.
+      operationId: createModule
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModuleRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminModuleResponse"
+  /api/v1/admin/courses/{courseId}/archive:
+    post:
+      tags:
+      - Admin Course API
+      summary: Archive course
+      description: Marks a course as archived.
+      operationId: archiveCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
   /ready:
     get:
       tags:
@@ -49,6 +430,82 @@ paths:
                 type: object
                 additionalProperties:
                   type: string
+  /api/v1/internal/courses/{courseId}/availability:
+    get:
+      tags:
+      - Internal Course API
+      summary: Get course availability
+      description: "Returns publication, access and enrollment state for LearningService\
+        \ enrollment checks."
+      operationId: getCourseAvailability
+      parameters:
+      - name: courseId
+        in: path
+        description: Course id
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1
+      responses:
+        "200":
+          description: Course availability returned
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalCourseAvailabilityResponse"
+        "401":
+          description: Missing or invalid internal API key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalCourseAvailabilityResponse"
+        "404":
+          description: Course not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalCourseAvailabilityResponse"
+      security:
+      - internalApiKey: []
+  /api/v1/internal/course-items/{itemId}/execution-package:
+    get:
+      tags:
+      - Internal Course API
+      summary: Get course item execution package
+      description: "Returns full execution data for a course item, including hidden\
+        \ tests and expected outputs. Intended only for trusted backend services."
+      operationId: getExecutionPackage
+      parameters:
+      - name: itemId
+        in: path
+        description: Course item id
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 2
+      responses:
+        "200":
+          description: Execution package returned
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ExecutionPackageResponse"
+        "401":
+          description: Missing or invalid internal API key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ExecutionPackageResponse"
+        "404":
+          description: Course item not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ExecutionPackageResponse"
+      security:
+      - internalApiKey: []
   /api/v1/courses:
     get:
       tags:
@@ -127,6 +584,681 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
 components:
   schemas:
+    UpdateModuleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        description:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+    AdminContentBlockResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        blockType:
+          type: string
+          enum:
+          - TEXT
+          - VIDEO
+          - IMAGE
+          - CODE
+          - EMBED
+          - FILE
+        orderIndex:
+          type: integer
+          format: int32
+        title:
+          type: string
+        textContent:
+          type: string
+        url:
+          type: string
+        language:
+          type: string
+        metadataJson:
+          type: string
+    AdminCourseItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        moduleId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        statement:
+          type: string
+        starterCode:
+          type: string
+        language:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        timeLimitMs:
+          type: integer
+          format: int32
+        memoryLimitMb:
+          type: integer
+          format: int32
+        outputLimitKb:
+          type: integer
+          format: int32
+        networkDisabled:
+          type: boolean
+        readOnlyFs:
+          type: boolean
+        comparisonMode:
+          type: string
+          enum:
+          - EXACT
+        normalizeLineEndings:
+          type: boolean
+        trimTrailingWhitespaces:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        contentBlocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminContentBlockResponse"
+        hints:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminHintResponse"
+        testCases:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTestCaseResponse"
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminQuizOptionResponse"
+    AdminHintResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderIndex:
+          type: integer
+          format: int32
+        text:
+          type: string
+    AdminModuleResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        courseId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminCourseItemResponse"
+    AdminQuizOptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderIndex:
+          type: integer
+          format: int32
+        label:
+          type: string
+        text:
+          type: string
+        correct:
+          type: boolean
+        explanation:
+          type: string
+    AdminTestCaseResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        testKey:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        visibility:
+          type: string
+          enum:
+          - OPEN
+          - HIDDEN
+        inputData:
+          type: string
+        expectedOutput:
+          type: string
+    UpdateCourseRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+          maxLength: 120
+          minLength: 0
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        shortDescription:
+          type: string
+          maxLength: 500
+          minLength: 0
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum:
+          - BEGINNER
+          - INTERMEDIATE
+          - ADVANCED
+        accessType:
+          type: string
+          enum:
+          - PUBLIC
+          - UNLISTED
+          - PRIVATE
+        enrollmentEnabled:
+          type: boolean
+        coverImageUrl:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        estimatedMinutes:
+          type: integer
+          format: int32
+          minimum: 0
+    AdminCourseResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+        title:
+          type: string
+        shortDescription:
+          type: string
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum:
+          - BEGINNER
+          - INTERMEDIATE
+          - ADVANCED
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        accessType:
+          type: string
+          enum:
+          - PUBLIC
+          - UNLISTED
+          - PRIVATE
+        enrollmentEnabled:
+          type: boolean
+        coverImageUrl:
+          type: string
+        estimatedMinutes:
+          type: integer
+          format: int32
+        createdByUserId:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminModuleResponse"
+    UpdateCourseItemRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        statement:
+          type: string
+        starterCode:
+          type: string
+        language:
+          type: string
+          maxLength: 50
+          minLength: 0
+        orderIndex:
+          type: integer
+          format: int32
+        timeLimitMs:
+          type: integer
+          format: int32
+          minimum: 1
+        memoryLimitMb:
+          type: integer
+          format: int32
+          minimum: 1
+        outputLimitKb:
+          type: integer
+          format: int32
+          minimum: 1
+        networkDisabled:
+          type: boolean
+        readOnlyFs:
+          type: boolean
+        comparisonMode:
+          type: string
+          enum:
+          - EXACT
+        normalizeLineEndings:
+          type: boolean
+        trimTrailingWhitespaces:
+          type: boolean
+    ReplaceTestCasesRequest:
+      type: object
+      properties:
+        testCases:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestCaseRequest"
+      required:
+      - testCases
+    TestCaseRequest:
+      type: object
+      properties:
+        testKey:
+          type: string
+          maxLength: 120
+          minLength: 0
+        orderIndex:
+          type: integer
+          format: int32
+        visibility:
+          type: string
+          enum:
+          - OPEN
+          - HIDDEN
+        inputData:
+          type: string
+        expectedOutput:
+          type: string
+      required:
+      - orderIndex
+      - testKey
+      - visibility
+    QuizOptionRequest:
+      type: object
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        label:
+          type: string
+          maxLength: 20
+          minLength: 0
+        text:
+          type: string
+          minLength: 1
+        correct:
+          type: boolean
+        explanation:
+          type: string
+      required:
+      - correct
+      - orderIndex
+      - text
+    ReplaceQuizOptionsRequest:
+      type: object
+      properties:
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizOptionRequest"
+      required:
+      - options
+    HintRequest:
+      type: object
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        text:
+          type: string
+          minLength: 1
+      required:
+      - orderIndex
+      - text
+    ReplaceHintsRequest:
+      type: object
+      properties:
+        hints:
+          type: array
+          items:
+            $ref: "#/components/schemas/HintRequest"
+      required:
+      - hints
+    ContentBlockRequest:
+      type: object
+      properties:
+        blockType:
+          type: string
+          enum:
+          - TEXT
+          - VIDEO
+          - IMAGE
+          - CODE
+          - EMBED
+          - FILE
+        orderIndex:
+          type: integer
+          format: int32
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        textContent:
+          type: string
+        url:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        language:
+          type: string
+          maxLength: 50
+          minLength: 0
+        metadataJson:
+          type: string
+      required:
+      - blockType
+      - orderIndex
+    ReplaceContentBlocksRequest:
+      type: object
+      properties:
+        contentBlocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentBlockRequest"
+      required:
+      - contentBlocks
+    CreateCourseItemRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        statement:
+          type: string
+        starterCode:
+          type: string
+        language:
+          type: string
+          maxLength: 50
+          minLength: 0
+        orderIndex:
+          type: integer
+          format: int32
+        timeLimitMs:
+          type: integer
+          format: int32
+          minimum: 1
+        memoryLimitMb:
+          type: integer
+          format: int32
+          minimum: 1
+        outputLimitKb:
+          type: integer
+          format: int32
+          minimum: 1
+        networkDisabled:
+          type: boolean
+        readOnlyFs:
+          type: boolean
+        comparisonMode:
+          type: string
+          enum:
+          - EXACT
+        normalizeLineEndings:
+          type: boolean
+        trimTrailingWhitespaces:
+          type: boolean
+      required:
+      - itemType
+      - orderIndex
+      - title
+    CreateCourseRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+          maxLength: 120
+          minLength: 0
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        shortDescription:
+          type: string
+          maxLength: 500
+          minLength: 0
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum:
+          - BEGINNER
+          - INTERMEDIATE
+          - ADVANCED
+        accessType:
+          type: string
+          enum:
+          - PUBLIC
+          - UNLISTED
+          - PRIVATE
+        enrollmentEnabled:
+          type: boolean
+        coverImageUrl:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        estimatedMinutes:
+          type: integer
+          format: int32
+          minimum: 0
+        createdByUserId:
+          type: integer
+          format: int64
+      required:
+      - createdByUserId
+      - slug
+      - title
+    CreateModuleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 0
+        description:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+      required:
+      - orderIndex
+      - title
+    InternalCourseAvailabilityResponse:
+      type: object
+      properties:
+        courseId:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        accessType:
+          type: string
+          enum:
+          - PUBLIC
+          - UNLISTED
+          - PRIVATE
+        enrollmentEnabled:
+          type: boolean
+        availableForEnrollment:
+          type: boolean
+    EvaluationPolicy:
+      type: object
+      properties:
+        comparisonMode:
+          type: string
+          enum:
+          - EXACT
+        normalizeLineEndings:
+          type: boolean
+        trimTrailingWhitespaces:
+          type: boolean
+    ExecutionLimits:
+      type: object
+      properties:
+        timeLimitMs:
+          type: integer
+          format: int32
+        memoryLimitMb:
+          type: integer
+          format: int32
+        outputLimitKb:
+          type: integer
+          format: int32
+    ExecutionPackageResponse:
+      type: object
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        moduleId:
+          type: integer
+          format: int64
+        courseId:
+          type: integer
+          format: int64
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        title:
+          type: string
+        language:
+          type: string
+        starterCode:
+          type: string
+        limits:
+          $ref: "#/components/schemas/ExecutionLimits"
+        executionPolicy:
+          $ref: "#/components/schemas/ExecutionPolicy"
+        evaluationPolicy:
+          $ref: "#/components/schemas/EvaluationPolicy"
+        tests:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalTestCaseResponse"
+    ExecutionPolicy:
+      type: object
+      properties:
+        networkDisabled:
+          type: boolean
+        readOnlyFs:
+          type: boolean
+    InternalTestCaseResponse:
+      type: object
+      properties:
+        testKey:
+          type: string
+        visibility:
+          type: string
+          enum:
+          - OPEN
+          - HIDDEN
+        inputData:
+          type: string
+        expectedOutput:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
     CourseCatalogItemResponse:
       type: object
       properties:
@@ -174,9 +1306,6 @@ components:
     ApiErrorResponse:
       type: object
       properties:
-        timestamp:
-          type: string
-          format: date-time
         status:
           type: integer
           format: int32
@@ -184,8 +1313,9 @@ components:
           type: string
         message:
           type: string
-        path:
+        timestamp:
           type: string
+          format: date-time
     CourseDetailsResponse:
       type: object
       properties:
@@ -412,9 +1542,7 @@ components:
   securitySchemes:
     internalApiKey:
       type: apiKey
+      description: Static service-to-service API key for internal CourseService endpoints.
+        This is an MVP mechanism and should be replaced or hardened for production.
       name: X-Internal-Api-Key
       in: header
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
