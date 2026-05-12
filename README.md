@@ -14,13 +14,13 @@ Implemented:
 - Public read API
 - Swagger/OpenAPI runtime documentation
 - Local OpenAPI contract file in the repository
+- Development demo course seed for manual QA
 
 Not implemented yet:
 
 - Admin API for course authors
 - Internal execution package API for `LearningService`
 - Final JWT/role-based security
-- Demo seed data
 - Full integration tests
 
 ## Technology stack
@@ -495,6 +495,7 @@ spring.jpa.properties.hibernate.format_sql=true
 
 app.internal-api-key=temp
 app.jwt.secret=temp
+app.demo-data.enabled=false
 ```
 
 `ddl-auto=update` is acceptable for local MVP development. It should be replaced by real database migrations before production usage.
@@ -538,6 +539,66 @@ Expected response:
 {
   "status": "UP"
 }
+```
+
+## Demo data for manual QA
+
+CourseService has a development-only seed that creates a demo published course with:
+
+- two modules;
+- a theory item with text, video, image and code content blocks;
+- a coding item with starter code, hints, open tests and a hidden test;
+- a quiz item with answer options.
+
+The seed is guarded by the `dev` Spring profile and by the `app.demo-data.enabled` property. It is idempotent: if a course with slug `python-basics-demo` already exists, it does not create duplicates.
+
+Start the service with demo data enabled:
+
+```powershell
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+The dev profile uses:
+
+```properties
+app.demo-data.enabled=true
+```
+
+Default profile keeps demo data disabled:
+
+```properties
+app.demo-data.enabled=false
+```
+
+Manual QA flow after starting with `dev` profile:
+
+```http
+GET http://localhost:8082/api/v1/courses
+GET http://localhost:8082/api/v1/courses/1
+GET http://localhost:8082/api/v1/course-items/1
+GET http://localhost:8082/swagger-ui.html
+```
+
+Expected public API behavior:
+
+- catalog returns the demo course;
+- course details return modules and item summaries;
+- item details return content blocks, hints, open tests and public quiz options;
+- hidden tests are not returned;
+- `expectedOutput` is not returned;
+- quiz option `correct` and `explanation` are not returned.
+
+If old local data conflicts with the seed during MVP development, reset the local PostgreSQL container:
+
+```powershell
+docker rm -f course-service-postgres
+
+docker run --name course-service-postgres `
+  -e POSTGRES_DB=course_service `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -p 5432:5432 `
+  -d postgres:16
 ```
 
 ## Database checks
@@ -699,13 +760,12 @@ Hidden tests and expected outputs must never be exposed through public endpoints
 
 Recommended next tasks:
 
-1. Seed demo course for manual QA.
-2. Create admin CourseService DTOs.
-3. Implement admin course management API.
-4. Implement internal execution package API for LearningService.
-5. Implement CourseService security checks.
-6. Add integration tests for public/admin/internal APIs.
-7. Replace `ddl-auto=update` with database migrations.
+1. Create admin CourseService DTOs.
+2. Implement admin course management API.
+3. Implement internal execution package API for LearningService.
+4. Implement CourseService security checks.
+5. Add integration tests for public/admin/internal APIs.
+6. Replace `ddl-auto=update` with database migrations.
 
 ## Current limitations
 
@@ -713,7 +773,6 @@ Recommended next tasks:
 - No internal execution package API yet.
 - No final JWT role validation yet.
 - No migration tool yet.
-- No seed/demo course yet.
 - No production-ready storage/media handling yet.
 - `metadataJson` is stored as text for MVP simplicity.
 
@@ -722,6 +781,7 @@ Recommended next tasks:
 ```text
 src/main/java/org/studyplatform/courseservice
 ├── config
+│   └── DevDemoDataSeeder.java
 ├── controller
 ├── dto
 │   └── publicapi
@@ -754,6 +814,9 @@ http://localhost:8082/ready
 http://localhost:8082/swagger-ui.html
 http://localhost:8082/v3/api-docs.yaml
 http://localhost:8082/api/v1/courses
+
+# optional demo data run
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 If OpenAPI changed, regenerate and commit:
