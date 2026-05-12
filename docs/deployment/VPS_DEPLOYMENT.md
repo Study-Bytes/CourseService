@@ -96,6 +96,24 @@ https://dev-api.studybytes.ru/course-service/swagger-ui.html
 
 In the full platform deployment, public traffic should enter through BFF/reverse proxy and this CourseService-specific exposure should be removed or kept localhost-only.
 
+Production profile enables Spring forwarded headers support:
+
+```properties
+server.forward-headers-strategy=framework
+```
+
+When CourseService is served behind Nginx under `/course-service`, Nginx must pass forwarded headers:
+
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Host $host;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Port $server_port;
+proxy_set_header X-Forwarded-Prefix /course-service;
+```
+
+These headers let Spring and Springdoc build Swagger/OpenAPI URLs with the correct public scheme, host and path prefix.
+
 Do not put UserService private keys into CourseService.
 
 ## 5. Start Service

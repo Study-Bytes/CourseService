@@ -332,6 +332,14 @@ https://dev-api.studybytes.ru/course-service/swagger-ui.html
 
 This is temporary. In the full platform deployment, public traffic should enter through BFF/reverse proxy and this CourseService-specific exposure should be removed or kept localhost-only.
 
+The production profile enables forwarded header support so Spring and Springdoc can build correct URLs behind Nginx path prefixes:
+
+```properties
+server.forward-headers-strategy=framework
+```
+
+Nginx should pass `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix` when serving CourseService under `/course-service`.
+
 Health checks:
 
 ```powershell

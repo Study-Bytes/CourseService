@@ -78,6 +78,14 @@ https://dev-api.studybytes.ru/course-service/swagger-ui.html
 
 Direct external access to `http://<vps-ip>:8082` should not work. Remove this CourseService-specific mapping or keep it localhost-only when BFF/reverse proxy becomes the platform entry point.
 
+The production Spring profile uses:
+
+```properties
+server.forward-headers-strategy=framework
+```
+
+Nginx should forward `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix` so Swagger and OpenAPI links match the public URL.
+
 ## Environment Files
 
 Only `.env.example` belongs in Git.
