@@ -13,13 +13,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.studyplatform.courseservice.dto.publicapi.CourseCatalogResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseDetailsResponse;
-import org.studyplatform.courseservice.dto.publicapi.CourseItemDetailsResponse;
+import org.studyplatform.courseservice.dto.publicapi.CourseItemPreviewResponse;
 import org.studyplatform.courseservice.exception.ApiErrorResponse;
 import org.studyplatform.courseservice.service.CoursePublicService;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Public courses", description = "Public read endpoints for published courses and course items")
+@Tag(name = "Public courses", description = "Public read endpoints for published course previews")
 public class PublicCourseController {
 
     private final CoursePublicService coursePublicService;
@@ -59,12 +59,11 @@ public class PublicCourseController {
     }
 
     @Operation(
-            summary = "Get published course item details",
-            description = "Returns course item content blocks, open tests, hints and public quiz options. "
-                    + "Hidden tests, expected outputs and correct quiz answers are not exposed."
+            summary = "Get published course item preview",
+            description = "Returns safe public course item preview only. Full item content is available through trusted internal endpoints after enrollment checks."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Published course item details"),
+            @ApiResponse(responseCode = "200", description = "Published course item preview"),
             @ApiResponse(
                     responseCode = "404",
                     description = "Course item not found or not publicly readable",
@@ -72,10 +71,10 @@ public class PublicCourseController {
             )
     })
     @GetMapping("/course-items/{itemId}")
-    public CourseItemDetailsResponse getPublishedCourseItemDetails(
+    public CourseItemPreviewResponse getPublishedCourseItemPreview(
             @Parameter(description = "Course item identifier", example = "1")
             @PathVariable Long itemId
     ) {
-        return coursePublicService.getPublishedCourseItemDetails(itemId);
+        return coursePublicService.getPublishedCourseItemPreview(itemId);
     }
 }
