@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.studyplatform.courseservice.repository.CourseItemContentBlockRepository;
@@ -30,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@WithMockUser(roles = "TEACHER")
 class AdminCourseControllerIntegrationTest {
 
     @Autowired
@@ -65,6 +68,25 @@ class AdminCourseControllerIntegrationTest {
         itemRepository.deleteAll();
         moduleRepository.deleteAll();
         courseRepository.deleteAll();
+    }
+
+
+    @Test
+    @WithAnonymousUser
+    void shouldRejectAdminRequestWithoutAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/courses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(minimalCreateCourseRequest("security-no-auth")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void shouldRejectAdminRequestWithoutTeacherOrAdminRole() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/courses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(minimalCreateCourseRequest("security-student")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -117,6 +139,17 @@ class AdminCourseControllerIntegrationTest {
     void shouldReturnNotFoundForMissingCourse() throws Exception {
         mockMvc.perform(get("/api/v1/admin/courses/{courseId}", 999999L))
                 .andExpect(status().isNotFound());
+    }
+
+
+    private String minimalCreateCourseRequest(String slug) {
+        return """
+                {
+                  "slug": "%s",
+                  "title": "Security Test Course",
+                  "createdByUserId": 1
+                }
+                """.formatted(slug + "-" + System.nanoTime());
     }
 
     private Long createCourse() throws Exception {
