@@ -34,6 +34,7 @@ services:
       COURSE_SERVICE_DB_USERNAME: ${COURSE_SERVICE_DB_USERNAME:-postgres}
       COURSE_SERVICE_DB_PASSWORD: ${COURSE_SERVICE_DB_PASSWORD:-postgres}
       COURSE_SERVICE_INTERNAL_API_KEY: ${COURSE_SERVICE_INTERNAL_API_KEY:-dev-course-service-internal-key}
+      COURSE_SERVICE_PORT: ${COURSE_SERVICE_PORT:-8082}
       USER_SERVICE_JWT_ISSUER_URI: ${USER_SERVICE_JWT_ISSUER_URI:-http://user-service:8081}
       USER_SERVICE_JWT_JWK_SET_URI: ${USER_SERVICE_JWT_JWK_SET_URI:-http://user-service:8081/api/v1/auth/.well-known/jwks.json}
       USER_SERVICE_JWT_AUDIENCE: ${USER_SERVICE_JWT_AUDIENCE:-study-platform}
@@ -47,10 +48,11 @@ services:
 
 networks:
   course_backend_net:
-    name: course_backend_net
+    name: ${COURSE_BACKEND_NETWORK:-studybytes_backend_net}
+    external: true
   course_db_net:
-    name: course_db_net
-    internal: true
+    name: ${COURSE_DB_NETWORK:-course_db_net}
+    external: true
 
 volumes:
   course_postgres_data:

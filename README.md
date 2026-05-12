@@ -294,6 +294,13 @@ CourseService deployment runs the application container with a dedicated Postgre
 COURSE_SERVICE_DB_URL=jdbc:postgresql://course-postgres:5432/course_service
 ```
 
+This compose file expects external networks. Create them once before startup:
+
+```powershell
+docker network create studybytes_backend_net
+docker network create --internal course_db_net
+```
+
 Local compose startup:
 
 ```powershell
@@ -311,37 +318,12 @@ irm http://localhost:8082/api/v1/courses | ConvertTo-Json -Depth 20
 
 The repository keeps only `.env.example`. Real `.env` files, private keys and secrets must stay outside Git.
 
-Important environment variables:
+Detailed deployment and integration guides:
 
-| Variable | Purpose |
-| --- | --- |
-| `COURSE_SERVICE_PORT` | Host/container HTTP port |
-| `COURSE_SERVICE_DB_URL` | JDBC URL for CourseService database |
-| `COURSE_SERVICE_DB_USERNAME` | Database user |
-| `COURSE_SERVICE_DB_PASSWORD` | Database password |
-| `COURSE_SERVICE_INTERNAL_API_KEY` | Backend-to-backend internal API key |
-| `USER_SERVICE_JWT_ISSUER_URI` | UserService JWT issuer |
-| `USER_SERVICE_JWT_JWK_SET_URI` | UserService JWKS endpoint |
-| `USER_SERVICE_JWT_AUDIENCE` | Expected JWT audience |
-| `COURSE_SERVICE_JWT_ROLES_CLAIM` | JWT claim containing roles |
-| `COURSE_SERVICE_JWT_ROLE_PREFIX` | Prefix used for Spring Security authorities |
-| `SPRING_PROFILES_ACTIVE` | `dev` or `prod` |
-
-Do not configure `COURSE_SERVICE_JWT_SECRET`. CourseService is a resource server: UserService signs access tokens with its private key, and CourseService verifies those tokens through UserService public JWKS.
-
-### Network topology
-
-Current CourseService compose file creates:
-
-```text
-host
-  -> course-service:8082
-      -> course_backend_net
-      -> course_db_net
-          -> course-postgres:5432
-```
-
-In the full platform, public traffic should go through Site/BFF/reverse proxy. CourseService and PostgreSQL should not be direct public entry points in production.
+- [BFF integration](docs/integration/BFF_USAGE.md)
+- [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
+- [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
+- [VPS deployment](docs/deployment/VPS_DEPLOYMENT.md)
 
 ## Run
 
@@ -396,40 +378,13 @@ irm http://localhost:8082/api/v1/internal/courses/1/availability -Headers @{"X-I
 
 ## Integration notes
 
-### Site
-
 Site should normally call BFF, not CourseService directly. CourseService public DTOs are still useful as contract references for course catalog, course page and item page UI models.
 
-### BFF
+Detailed integration guides:
 
-BFF should aggregate:
-
-- CourseService course structure;
-- LearningService user enrollment/progress;
-- UserService current user/profile data.
-
-### LearningService
-
-LearningService should reference CourseService entities by ids:
-
-- `courseId`
-- `moduleId`
-- `itemId`
-
-LearningService owns:
-
-- enrollment;
-- progress;
-- attempts;
-- user item status;
-- best result;
-- aggregated course progress.
-
-CourseService does not duplicate that state.
-
-### CodeExecutorService
-
-CodeExecutorService should not call CourseService directly in the normal flow. LearningService will later request execution package data from CourseService internal API and send technical execution requests to CodeExecutorService.
+- [BFF integration](docs/integration/BFF_USAGE.md)
+- [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
+- [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
 
 ## Next planned tasks
 
