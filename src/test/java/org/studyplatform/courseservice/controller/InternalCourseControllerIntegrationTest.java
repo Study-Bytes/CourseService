@@ -122,12 +122,31 @@ class InternalCourseControllerIntegrationTest {
     }
 
     @Test
-    void shouldKeepPublicEndpointSafeWhenInternalDataContainsHiddenTests() throws Exception {
+    void shouldReturnStudentSafeContentForValidInternalApiKey() throws Exception {
+        Long itemId = seedCodingItem().itemId();
+
+        mockMvc.perform(get("/api/v1/internal/course-items/{itemId}/content", itemId)
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemId").value(itemId))
+                .andExpect(jsonPath("$.openTests", hasSize(1)))
+                .andExpect(content().string(not(containsString("expectedOutput"))))
+                .andExpect(content().string(not(containsString("HIDDEN"))))
+                .andExpect(content().string(not(containsString("correct"))));
+    }
+
+    @Test
+    void shouldKeepPublicEndpointAsPreviewOnlyWhenInternalDataContainsHiddenTests() throws Exception {
         Long itemId = seedCodingItem().itemId();
 
         mockMvc.perform(get("/api/v1/course-items/{itemId}", itemId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.openTests", hasSize(1)))
+                .andExpect(jsonPath("$.id").value(itemId))
+                .andExpect(jsonPath("$.title").value("Print square"))
+                .andExpect(jsonPath("$.itemType").value("CODING"))
+                .andExpect(content().string(not(containsString("contentBlocks"))))
+                .andExpect(content().string(not(containsString("starterCode"))))
+                .andExpect(content().string(not(containsString("openTests"))))
                 .andExpect(content().string(not(containsString("expectedOutput"))))
                 .andExpect(content().string(not(containsString("HIDDEN"))));
     }

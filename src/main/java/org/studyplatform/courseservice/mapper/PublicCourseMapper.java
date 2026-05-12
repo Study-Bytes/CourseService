@@ -8,6 +8,7 @@ import org.studyplatform.courseservice.dto.publicapi.CourseItemDetailsResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemHintResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemLimitsResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemOptionResponse;
+import org.studyplatform.courseservice.dto.publicapi.CourseItemPreviewResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemSummaryResponse;
 import org.studyplatform.courseservice.dto.publicapi.EvaluationPolicyResponse;
 import org.studyplatform.courseservice.dto.publicapi.ExecutionPolicyResponse;
@@ -96,6 +97,19 @@ public class PublicCourseMapper {
     public CourseItemSummaryResponse toItemSummary(CourseItem item) {
         return new CourseItemSummaryResponse(
                 item.getId(),
+                item.getTitle(),
+                item.getItemType(),
+                item.getLanguage(),
+                item.getOrderIndex()
+        );
+    }
+
+
+    public CourseItemPreviewResponse toItemPreview(CourseItem item) {
+        return new CourseItemPreviewResponse(
+                item.getId(),
+                item.getModule().getId(),
+                item.getModule().getCourse().getId(),
                 item.getTitle(),
                 item.getItemType(),
                 item.getLanguage(),

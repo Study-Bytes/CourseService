@@ -4,7 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.studyplatform.courseservice.dto.publicapi.CourseCatalogResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseDetailsResponse;
-import org.studyplatform.courseservice.dto.publicapi.CourseItemDetailsResponse;
+import org.studyplatform.courseservice.dto.publicapi.CourseItemPreviewResponse;
 import org.studyplatform.courseservice.entity.Course;
 import org.studyplatform.courseservice.entity.CourseItem;
 import org.studyplatform.courseservice.entity.CourseModule;
@@ -79,7 +79,7 @@ public class CoursePublicService {
         return publicCourseMapper.toCourseDetails(course, modules, items);
     }
 
-    public CourseItemDetailsResponse getPublishedCourseItemDetails(Long itemId) {
+    public CourseItemPreviewResponse getPublishedCourseItemPreview(Long itemId) {
         CourseItem item = courseItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course item not found"));
 
@@ -89,13 +89,7 @@ public class CoursePublicService {
             throw new ResourceNotFoundException("Course item not found");
         }
 
-        return publicCourseMapper.toItemDetails(
-                item,
-                contentBlockRepository.findByItemIdOrderByOrderIndexAsc(item.getId()),
-                testCaseRepository.findByItemIdOrderByOrderIndexAsc(item.getId()),
-                hintRepository.findByItemIdOrderByOrderIndexAsc(item.getId()),
-                optionRepository.findByItemIdOrderByOrderIndexAsc(item.getId())
-        );
+        return publicCourseMapper.toItemPreview(item);
     }
 
     private boolean isPubliclyReadableCourse(Course course) {

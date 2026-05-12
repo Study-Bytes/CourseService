@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.studyplatform.courseservice.config.OpenApiConfig;
 import org.studyplatform.courseservice.dto.internal.ExecutionPackageResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseAvailabilityResponse;
+import org.studyplatform.courseservice.dto.internal.InternalCourseItemContentResponse;
 import org.studyplatform.courseservice.service.CourseInternalService;
 
 @RestController
@@ -43,6 +44,25 @@ public class InternalCourseController {
             @PathVariable Long itemId
     ) {
         return ResponseEntity.ok(courseInternalService.getExecutionPackage(itemId));
+    }
+
+
+    @Operation(
+            summary = "Get enrolled-student-safe course item content",
+            description = "Returns full course item content for trusted backend services after enrollment checks. "
+                    + "Does not expose hidden tests, expected outputs or correct quiz answers."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Course item content returned"),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid internal API key"),
+            @ApiResponse(responseCode = "404", description = "Course item not found")
+    })
+    @GetMapping("/course-items/{itemId}/content")
+    public ResponseEntity<InternalCourseItemContentResponse> getCourseItemContent(
+            @Parameter(description = "Course item id", example = "2")
+            @PathVariable Long itemId
+    ) {
+        return ResponseEntity.ok(courseInternalService.getCourseItemContent(itemId));
     }
 
     @Operation(

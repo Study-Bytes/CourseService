@@ -1,6 +1,8 @@
 package org.studyplatform.courseservice.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.studyplatform.courseservice.entity.Course;
 import org.studyplatform.courseservice.entity.enums.CourseAccessType;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
@@ -22,4 +24,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             CourseStatus status,
             CourseAccessType accessType
     );
+
+    @Query("select c.createdByUserId from Course c where c.id = :courseId")
+    Optional<Long> findCreatedByUserIdById(@Param("courseId") Long courseId);
 }
