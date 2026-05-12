@@ -330,6 +330,7 @@ The repository keeps only `.env.example`. Real `.env` files, private keys and se
 
 Detailed deployment and integration guides:
 
+- [Endpoints quick reference](docs/integration/ENDPOINTS_QUICK_REFERENCE.md)
 - [BFF integration](docs/integration/BFF_USAGE.md)
 - [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
 - [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
@@ -395,6 +396,7 @@ Site should normally call BFF, not CourseService directly. CourseService public 
 
 Detailed integration guides:
 
+- [Endpoints quick reference](docs/integration/ENDPOINTS_QUICK_REFERENCE.md)
 - [BFF integration](docs/integration/BFF_USAGE.md)
 - [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
 - [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)

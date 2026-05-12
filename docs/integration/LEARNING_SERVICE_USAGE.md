@@ -2,6 +2,8 @@
 
 LearningService owns user-course state. CourseService owns course structure and author-created content.
 
+For a compact endpoint ownership table, see [Endpoints Quick Reference](ENDPOINTS_QUICK_REFERENCE.md).
+
 ## Base URL
 
 Inside Docker:
@@ -117,4 +119,3 @@ Store CourseService identifiers instead:
 - `courseId`;
 - `moduleId`;
 - `itemId`.
-

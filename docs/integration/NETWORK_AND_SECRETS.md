@@ -2,6 +2,8 @@
 
 CourseService deployment uses separate networks for backend traffic and database traffic.
 
+For endpoint ownership and caller rules, see [Endpoints Quick Reference](ENDPOINTS_QUICK_REFERENCE.md).
+
 ## Networks
 
 Recommended platform networks:
