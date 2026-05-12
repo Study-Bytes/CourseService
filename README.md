@@ -63,7 +63,7 @@ Course
 
 ## Public API
 
-Public read endpoints expose only safe public data.
+Public read endpoints expose only safe course preview data.
 
 ```http
 GET /api/v1/courses
@@ -71,11 +71,20 @@ GET /api/v1/courses/{courseId}
 GET /api/v1/course-items/{itemId}
 ```
 
+`GET /api/v1/courses/{courseId}` returns course metadata, module summaries and item summaries.
+
+`GET /api/v1/course-items/{itemId}` returns item preview only: identifiers, title, type, language and order. It does not return full lesson content.
+
 Public responses must not expose:
 
+- full content blocks;
+- starter code;
+- hints;
+- tests;
 - hidden tests;
 - expected output;
-- correct quiz answers.
+- correct quiz answers;
+- quiz explanations.
 
 ## Admin API
 
@@ -134,6 +143,27 @@ PUT /api/v1/admin/course-items/{itemId}/options
 
 These endpoints replace the whole child collection for a course item. This is simpler for an MVP course editor: the frontend/BFF sends the current list as the source of truth.
 
+### Admin ownership model
+
+Admin endpoints use role-level and object-level checks.
+
+```text
+ADMIN   -> can manage every course
+TEACHER -> can manage only courses where Course.createdByUserId == JWT.sub
+STUDENT -> no admin access
+```
+
+Ownership is checked for:
+
+- course operations;
+- module operations;
+- course item operations;
+- content block replacement;
+- hint replacement;
+- test case replacement;
+- quiz option replacement.
+
+A `TEACHER` cannot create a course for another user id. `createdByUserId` must match the JWT `sub` value, unless the caller has `ADMIN` role.
 
 
 ## Internal API
@@ -152,6 +182,33 @@ Configured in `application.properties`:
 ```properties
 app.internal-api-key=dev-course-service-internal-key
 ```
+
+### Student-safe item content
+
+```http
+GET /api/v1/internal/course-items/{itemId}/content
+```
+
+This endpoint is intended for BFF/LearningService after enrollment checks.
+
+It returns:
+
+- statement;
+- starter code;
+- content blocks;
+- open tests only;
+- hints;
+- quiz options without correct flags;
+- execution limits;
+- execution policy;
+- evaluation policy.
+
+It does not return:
+
+- hidden tests;
+- expected outputs;
+- correct quiz answers;
+- quiz explanations.
 
 ### Execution package
 
@@ -198,9 +255,9 @@ CourseService separates public, admin and internal access:
 /health, /ready                  -> public
 /swagger-ui.html, /swagger-ui/** -> public in the current dev configuration
 /v3/api-docs, /v3/api-docs.yaml  -> public in the current dev configuration
-/api/v1/courses/**               -> public read API
-/api/v1/course-items/**          -> public read API
-/api/v1/admin/**                 -> Bearer JWT with TEACHER or ADMIN role
+/api/v1/courses/**               -> public preview API
+/api/v1/course-items/**          -> public item preview API only
+/api/v1/admin/**                 -> Bearer JWT with TEACHER or ADMIN role + ownership checks
 /api/v1/internal/**              -> X-Internal-Api-Key
 ```
 
@@ -218,7 +275,11 @@ Internal API configuration:
 app.internal-api-key=dev-course-service-internal-key
 ```
 
-Public endpoints must never expose hidden tests, expected outputs or correct quiz answers. Internal endpoints may expose hidden tests and expected outputs only to trusted backend services.
+Public endpoints must never expose hidden tests, expected outputs, full item content or correct quiz answers.
+
+Internal content endpoints may expose enrolled-student-safe item content to trusted backend services.
+
+Internal execution endpoints may expose hidden tests and expected outputs only to LearningService or trusted execution flows.
 
 ## Swagger/OpenAPI
 
@@ -314,6 +375,7 @@ Run OpenAPI generation:
 irm http://localhost:8082/api/v1/courses
 irm http://localhost:8082/api/v1/courses/1
 irm http://localhost:8082/api/v1/course-items/1
+irm http://localhost:8082/api/v1/internal/course-items/2/content -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 ```
 
 Check admin API:
@@ -329,6 +391,7 @@ PowerShell does not support raw `GET http://...` syntax. Use `irm` or Postman.
 Check internal API:
 
 ```powershell
+irm http://localhost:8082/api/v1/internal/course-items/2/content -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 irm http://localhost:8082/api/v1/internal/course-items/2/execution-package -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 irm http://localhost:8082/api/v1/internal/courses/1/availability -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 ```
@@ -348,6 +411,20 @@ BFF should aggregate:
 - UserService current user/profile data.
 
 ### LearningService
+
+LearningService checks enrollment before requesting full course content.
+
+Expected enrolled-content flow:
+
+```text
+Site -> BFF -> LearningService checks enrollment -> CourseService internal content API -> BFF -> Site
+```
+
+Expected execution flow:
+
+```text
+Site -> BFF -> LearningService checks enrollment/attempt rules -> CourseService execution package API -> CodeExecutorService -> LearningService saves attempt/progress
+```
 
 LearningService should reference CourseService entities by ids:
 
@@ -372,6 +449,8 @@ CodeExecutorService should not call CourseService directly in the normal flow. L
 
 ## Next planned tasks
 
-- Implement CourseService security checks.
-- Add broader integration tests for public/admin/internal APIs.
-- Prepare deployment configuration.
+- Prepare deployment/secrets/network guide.
+- Add Docker/deployment configuration.
+- Add CI/CD pipeline.
+- Add Flyway database migrations.
+- Expand integration and contract tests.

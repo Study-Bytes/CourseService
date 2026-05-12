@@ -7,10 +7,10 @@ servers:
 - url: http://localhost:8082
   description: Generated server url
 tags:
-- name: Public courses
-  description: Public read endpoints for published courses and course items
 - name: System
   description: Technical health and readiness checks
+- name: Public courses
+  description: Public read endpoints for published course previews
 - name: Internal Course API
   description: Trusted backend endpoints for LearningService and BFF integrations
 - name: Admin Course API
@@ -538,6 +538,45 @@ paths:
                 $ref: "#/components/schemas/ExecutionPackageResponse"
       security:
       - internalApiKey: []
+  /api/v1/internal/course-items/{itemId}/content:
+    get:
+      tags:
+      - Internal Course API
+      summary: Get enrolled-student-safe course item content
+      description: "Returns full course item content for trusted backend services\
+        \ after enrollment checks. Does not expose hidden tests, expected outputs\
+        \ or correct quiz answers."
+      operationId: getCourseItemContent
+      parameters:
+      - name: itemId
+        in: path
+        description: Course item id
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 2
+      responses:
+        "200":
+          description: Course item content returned
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalCourseItemContentResponse"
+        "401":
+          description: Missing or invalid internal API key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalCourseItemContentResponse"
+        "404":
+          description: Course item not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalCourseItemContentResponse"
+      security:
+      - internalApiKey: []
   /api/v1/courses:
     get:
       tags:
@@ -587,11 +626,10 @@ paths:
     get:
       tags:
       - Public courses
-      summary: Get published course item details
-      description: "Returns course item content blocks, open tests, hints and public\
-        \ quiz options. Hidden tests, expected outputs and correct quiz answers are\
-        \ not exposed."
-      operationId: getPublishedCourseItemDetails
+      summary: Get published course item preview
+      description: Returns safe public course item preview only. Full item content
+        is available through trusted internal endpoints after enrollment checks.
+      operationId: getPublishedCourseItemPreview
       parameters:
       - name: itemId
         in: path
@@ -603,11 +641,11 @@ paths:
         example: 1
       responses:
         "200":
-          description: Published course item details
+          description: Published course item preview
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/CourseItemDetailsResponse"
+                $ref: "#/components/schemas/CourseItemPreviewResponse"
         "404":
           description: Course item not found or not publicly readable
           content:
@@ -1291,6 +1329,148 @@ components:
         orderIndex:
           type: integer
           format: int32
+    ContentBlockResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        blockType:
+          type: string
+          enum:
+          - TEXT
+          - VIDEO
+          - IMAGE
+          - CODE
+          - EMBED
+          - FILE
+        orderIndex:
+          type: integer
+          format: int32
+        title:
+          type: string
+        textContent:
+          type: string
+        url:
+          type: string
+        language:
+          type: string
+        metadataJson:
+          type: string
+    CourseItemHintResponse:
+      type: object
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        text:
+          type: string
+    CourseItemLimitsResponse:
+      type: object
+      properties:
+        timeLimitMs:
+          type: integer
+          format: int32
+        memoryLimitMb:
+          type: integer
+          format: int32
+        outputLimitKb:
+          type: integer
+          format: int32
+    CourseItemOptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderIndex:
+          type: integer
+          format: int32
+        label:
+          type: string
+        text:
+          type: string
+    EvaluationPolicyResponse:
+      type: object
+      properties:
+        comparisonMode:
+          type: string
+          enum:
+          - EXACT
+        normalizeLineEndings:
+          type: boolean
+        trimTrailingWhitespaces:
+          type: boolean
+    ExecutionPolicyResponse:
+      type: object
+      properties:
+        networkDisabled:
+          type: boolean
+        readOnlyFs:
+          type: boolean
+    InternalCourseItemContentResponse:
+      type: object
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        moduleId:
+          type: integer
+          format: int64
+        courseId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        statement:
+          type: string
+        starterCode:
+          type: string
+        language:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        limits:
+          $ref: "#/components/schemas/CourseItemLimitsResponse"
+        executionPolicy:
+          $ref: "#/components/schemas/ExecutionPolicyResponse"
+        evaluationPolicy:
+          $ref: "#/components/schemas/EvaluationPolicyResponse"
+        contentBlocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentBlockResponse"
+        openTests:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenTestCaseResponse"
+        hints:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseItemHintResponse"
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseItemOptionResponse"
+    OpenTestCaseResponse:
+      type: object
+      properties:
+        testKey:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        inputData:
+          type: string
     CourseCatalogItemResponse:
       type: object
       properties:
@@ -1432,41 +1612,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CourseItemSummaryResponse"
-    ContentBlockResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        blockType:
-          type: string
-          enum:
-          - TEXT
-          - VIDEO
-          - IMAGE
-          - CODE
-          - EMBED
-          - FILE
-        orderIndex:
-          type: integer
-          format: int32
-        title:
-          type: string
-        textContent:
-          type: string
-        url:
-          type: string
-        language:
-          type: string
-        metadataJson:
-          type: string
-    CourseItemDetailsResponse:
+    CourseItemPreviewResponse:
       type: object
       properties:
         id:
           type: integer
           format: int64
         moduleId:
+          type: integer
+          format: int64
+        courseId:
           type: integer
           format: int64
         title:
@@ -1479,98 +1634,11 @@ components:
           - QUIZ
           - THEORY
           - FILE
-        statement:
-          type: string
-        starterCode:
-          type: string
         language:
           type: string
         orderIndex:
           type: integer
           format: int32
-        limits:
-          $ref: "#/components/schemas/CourseItemLimitsResponse"
-        executionPolicy:
-          $ref: "#/components/schemas/ExecutionPolicyResponse"
-        evaluationPolicy:
-          $ref: "#/components/schemas/EvaluationPolicyResponse"
-        contentBlocks:
-          type: array
-          items:
-            $ref: "#/components/schemas/ContentBlockResponse"
-        openTests:
-          type: array
-          items:
-            $ref: "#/components/schemas/OpenTestCaseResponse"
-        hints:
-          type: array
-          items:
-            $ref: "#/components/schemas/CourseItemHintResponse"
-        options:
-          type: array
-          items:
-            $ref: "#/components/schemas/CourseItemOptionResponse"
-    CourseItemHintResponse:
-      type: object
-      properties:
-        orderIndex:
-          type: integer
-          format: int32
-        text:
-          type: string
-    CourseItemLimitsResponse:
-      type: object
-      properties:
-        timeLimitMs:
-          type: integer
-          format: int32
-        memoryLimitMb:
-          type: integer
-          format: int32
-        outputLimitKb:
-          type: integer
-          format: int32
-    CourseItemOptionResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        orderIndex:
-          type: integer
-          format: int32
-        label:
-          type: string
-        text:
-          type: string
-    EvaluationPolicyResponse:
-      type: object
-      properties:
-        comparisonMode:
-          type: string
-          enum:
-          - EXACT
-        normalizeLineEndings:
-          type: boolean
-        trimTrailingWhitespaces:
-          type: boolean
-    ExecutionPolicyResponse:
-      type: object
-      properties:
-        networkDisabled:
-          type: boolean
-        readOnlyFs:
-          type: boolean
-    OpenTestCaseResponse:
-      type: object
-      properties:
-        testKey:
-          type: string
-        orderIndex:
-          type: integer
-          format: int32
-        inputData:
-          type: string
   securitySchemes:
     bearerAuth:
       type: http
