@@ -324,6 +324,7 @@ Detailed deployment and integration guides:
 - [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
 - [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
 - [VPS deployment](docs/deployment/VPS_DEPLOYMENT.md)
+- [CI/CD pipeline](docs/deployment/CI_CD.md)
 
 ## Run
 
@@ -389,7 +390,6 @@ Detailed integration guides:
 ## Next planned tasks
 
 - Add Flyway migrations and switch production `ddl-auto` to `validate`.
-- Add CI/CD pipeline.
 - Add contract tests for BFF and LearningService integration.
 
 
