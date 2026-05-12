@@ -41,8 +41,8 @@ services:
       COURSE_SERVICE_JWT_ROLES_CLAIM: ${COURSE_SERVICE_JWT_ROLES_CLAIM:-roles}
       COURSE_SERVICE_JWT_ROLE_PREFIX: ${COURSE_SERVICE_JWT_ROLE_PREFIX:-ROLE_}
     ports:
-      # Temporary direct host access for team Swagger checks until BFF/reverse proxy is ready.
-      - "${COURSE_SERVICE_PORT:-8082}:8082"
+      # Temporary localhost-only host access for VPS Nginx until BFF/reverse proxy is ready.
+      - "127.0.0.1:${COURSE_SERVICE_PORT:-8082}:8082"
     networks:
       - course_backend_net
       - course_db_net

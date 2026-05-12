@@ -80,13 +80,21 @@ COURSE_SERVICE_JWT_ROLE_PREFIX=ROLE_
 SPRING_PROFILES_ACTIVE=prod
 ```
 
-`COURSE_SERVICE_PORT` is currently a temporary external host port for direct team access while BFF/reverse proxy is not ready:
+`COURSE_SERVICE_PORT` is currently a temporary localhost-only host port for Nginx while BFF/reverse proxy is not ready:
 
 ```text
-http://<vps-ip>:8082/swagger-ui.html
+127.0.0.1:8082 -> course-service:8082
 ```
 
-The application container still listens on `8082`. In the full platform deployment, public traffic should enter through BFF/reverse proxy and direct CourseService exposure should be removed or restricted.
+The application container still listens on `8082`. Docker binds the host port to `127.0.0.1`, so Nginx on the VPS can proxy to `http://127.0.0.1:8082`, but direct external access to `http://<vps-ip>:8082` should not work.
+
+Temporary public access should go through Nginx:
+
+```text
+https://dev-api.studybytes.ru/course-service/swagger-ui.html
+```
+
+In the full platform deployment, public traffic should enter through BFF/reverse proxy and this CourseService-specific exposure should be removed or kept localhost-only.
 
 Do not put UserService private keys into CourseService.
 

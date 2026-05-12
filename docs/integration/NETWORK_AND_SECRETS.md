@@ -60,23 +60,23 @@ docker network rm course_db_net
 Production rules:
 
 - PostgreSQL must not be exposed publicly.
-- CourseService direct host exposure is temporary for team Swagger checks while BFF/reverse proxy is not ready.
+- CourseService host exposure is temporary and must be bound to `127.0.0.1` for VPS Nginx.
 - Public traffic should enter through reverse proxy, Site and BFF.
 - Internal CourseService endpoints should be reachable only from backend services.
 
-For local development and temporary team checks, `docker-compose.yml` maps CourseService to the host:
+For local development and temporary VPS Nginx proxying, `docker-compose.yml` maps CourseService to the host loopback interface:
 
 ```text
-localhost:8082 -> course-service:8082
+127.0.0.1:8082 -> course-service:8082
 ```
 
-Temporary VPS Swagger URL:
+Temporary public Swagger URL through Nginx:
 
 ```text
-http://<vps-ip>:8082/swagger-ui.html
+https://dev-api.studybytes.ru/course-service/swagger-ui.html
 ```
 
-Remove or restrict this direct port mapping when BFF/reverse proxy becomes the platform entry point.
+Direct external access to `http://<vps-ip>:8082` should not work. Remove this CourseService-specific mapping or keep it localhost-only when BFF/reverse proxy becomes the platform entry point.
 
 ## Environment Files
 

@@ -318,13 +318,19 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Until BFF/reverse proxy is ready, `docker-compose.yml` intentionally exposes CourseService directly for team Swagger checks:
+Until BFF/reverse proxy is ready, `docker-compose.yml` publishes CourseService only on the VPS loopback interface for Nginx:
 
 ```text
-http://<vps-ip>:8082/swagger-ui.html
+127.0.0.1:8082 -> course-service:8082
 ```
 
-This is temporary. In the full platform deployment, public traffic should enter through BFF/reverse proxy and the direct CourseService port mapping should be removed or restricted.
+This means Nginx on the VPS can proxy to `http://127.0.0.1:8082`, but `http://<vps-ip>:8082` should not be reachable from outside. Public team access should go through Nginx, for example:
+
+```text
+https://dev-api.studybytes.ru/course-service/swagger-ui.html
+```
+
+This is temporary. In the full platform deployment, public traffic should enter through BFF/reverse proxy and this CourseService-specific exposure should be removed or kept localhost-only.
 
 Health checks:
 
