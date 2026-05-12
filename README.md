@@ -362,6 +362,8 @@ Run OpenAPI generation:
 .\mvnw.cmd verify -Popenapi
 ```
 
+The Maven `openapi` profile starts the app with Spring profiles `dev,openapi`. The `openapi` Spring profile disables external JWT/JWKS lookup during contract generation, so this command does not require UserService to be running.
+
 ## Manual API checks
 
 ```powershell

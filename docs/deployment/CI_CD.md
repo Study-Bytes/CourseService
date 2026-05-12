@@ -32,6 +32,8 @@ docker build -t studybytes/course-service:ci .
 
 The OpenAPI check is intentional. If controllers or DTOs change and the committed local OpenAPI file is stale, CI must fail.
 
+OpenAPI generation starts the app with the `dev,openapi` Spring profiles. The `openapi` profile provides a local JWT decoder placeholder, so CI can generate `/v3/api-docs.yaml` without requiring a running UserService or JWKS endpoint.
+
 ## CI PostgreSQL
 
 The workflow starts a PostgreSQL service container for OpenAPI generation and application startup checks:
