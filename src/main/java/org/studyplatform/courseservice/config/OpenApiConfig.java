@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+    public static final String BEARER_AUTH_SCHEME = "bearerAuth";
     public static final String INTERNAL_API_KEY_SCHEME = "internalApiKey";
 
     @Bean
@@ -20,6 +21,14 @@ public class OpenApiConfig {
                         .version("v1")
                         .description("Course content and structure service API."))
                 .components(new Components()
+                        .addSecuritySchemes(
+                                BEARER_AUTH_SCHEME,
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")
+                                        .description("Bearer JWT for CourseService admin endpoints. Required roles: TEACHER or ADMIN.")
+                        )
                         .addSecuritySchemes(
                                 INTERNAL_API_KEY_SCHEME,
                                 new SecurityScheme()

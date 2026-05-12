@@ -81,7 +81,20 @@ Public responses must not expose:
 
 Admin endpoints are used by course authors, teachers or BFF creator flows.
 
-> Current security note: admin endpoints are not production-secured yet. Proper JWT role checks will be implemented in a separate security task.
+Admin endpoints require Bearer JWT authentication. The token must contain the `TEACHER` or `ADMIN` role in the configured roles claim.
+
+```http
+Authorization: Bearer <jwt>
+```
+
+The current development configuration expects roles in the `roles` claim, for example:
+
+```json
+{
+  "sub": "teacher-1",
+  "roles": ["TEACHER"]
+}
+```
 
 ### Course management
 
@@ -175,6 +188,37 @@ Public endpoints must continue to hide:
 - expected output;
 - correct quiz answers;
 - quiz explanations.
+
+
+## Security model
+
+CourseService separates public, admin and internal access:
+
+```text
+/health, /ready                  -> public
+/swagger-ui.html, /swagger-ui/** -> public in the current dev configuration
+/v3/api-docs, /v3/api-docs.yaml  -> public in the current dev configuration
+/api/v1/courses/**               -> public read API
+/api/v1/course-items/**          -> public read API
+/api/v1/admin/**                 -> Bearer JWT with TEACHER or ADMIN role
+/api/v1/internal/**              -> X-Internal-Api-Key
+```
+
+JWT configuration:
+
+```properties
+app.security.jwt.secret=dev-course-service-jwt-secret-key-which-is-at-least-32-bytes-long
+app.security.jwt.roles-claim=roles
+app.security.jwt.role-prefix=ROLE_
+```
+
+Internal API configuration:
+
+```properties
+app.internal-api-key=dev-course-service-internal-key
+```
+
+Public endpoints must never expose hidden tests, expected outputs or correct quiz answers. Internal endpoints may expose hidden tests and expected outputs only to trusted backend services.
 
 ## Swagger/OpenAPI
 
