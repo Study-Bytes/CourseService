@@ -52,7 +52,8 @@ networks:
     external: true
   course_db_net:
     name: ${COURSE_DB_NETWORK:-course_db_net}
-    external: true
+    driver: bridge
+    internal: true
 
 volumes:
   course_postgres_data:

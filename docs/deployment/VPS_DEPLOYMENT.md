@@ -28,16 +28,26 @@ Place repository files under:
 /opt/studybytes/course-service
 ```
 
-## 3. Create External Networks
+## 3. Create Backend Network
 
-CourseService compose expects external networks.
+CourseService uses two Docker networks:
+
+- `studybytes_backend_net` is the shared external backend network. BFF, UserService, CourseService and LearningService must all join this network.
+- `course_db_net` is the private CourseService database network. It is created by `docker compose` as an internal network and should contain only `course-service` and `course-postgres`.
+
+Create only the shared backend network manually:
 
 ```bash
 docker network create studybytes_backend_net
-docker network create --internal course_db_net
 ```
 
-If the full platform compose already creates these networks, reuse the same names.
+If the full platform compose already creates the backend network, reuse the same name.
+
+If `course_db_net` was created manually while testing an older compose file, remove it before starting CourseService:
+
+```bash
+docker network rm course_db_net
+```
 
 ## 4. Create Environment File
 
@@ -149,4 +159,3 @@ docker compose down
 ```
 
 Do not delete the `course_postgres_data` volume unless a full database reset is intended.
-

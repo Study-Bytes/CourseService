@@ -294,11 +294,21 @@ CourseService deployment runs the application container with a dedicated Postgre
 COURSE_SERVICE_DB_URL=jdbc:postgresql://course-postgres:5432/course_service
 ```
 
-This compose file expects external networks. Create them once before startup:
+This compose file uses two Docker networks:
+
+- `COURSE_BACKEND_NETWORK` is the shared external backend network for BFF, UserService, CourseService and LearningService.
+- `COURSE_DB_NETWORK` is the private CourseService database network. Do not create it manually; Docker Compose creates it as an internal network for `course-service` and `course-postgres`.
+
+Create only the shared backend network once before startup:
 
 ```powershell
 docker network create studybytes_backend_net
-docker network create --internal course_db_net
+```
+
+If `course_db_net` was created manually before, remove it once before the next startup so Compose can recreate it with the right internal settings:
+
+```powershell
+docker network rm course_db_net
 ```
 
 Local compose startup:

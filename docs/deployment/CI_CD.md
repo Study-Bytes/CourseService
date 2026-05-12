@@ -101,7 +101,7 @@ Git
 CourseService repository cloned into $VPS_DEPLOY_PATH
 .env file created in $VPS_DEPLOY_PATH
 SSH access for VPS_USER
-external Docker networks created
+shared backend Docker network created
 ```
 
 Example initial setup on VPS:
@@ -118,11 +118,18 @@ nano .env
 
 Then fill real values in `.env`.
 
-Create the external networks used by `docker-compose.yml`:
+Create the shared backend network used by `docker-compose.yml`:
 
 ```bash
 docker network create studybytes_backend_net
-docker network create --internal course_db_net
+```
+
+Do not create `course_db_net` manually. CourseService compose creates it as an internal private network for `course-service` and `course-postgres`.
+
+If `course_db_net` already exists from an older setup, remove it once before deployment:
+
+```bash
+docker network rm course_db_net
 ```
 
 ## Secrets policy
