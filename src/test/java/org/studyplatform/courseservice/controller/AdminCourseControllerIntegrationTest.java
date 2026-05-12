@@ -17,6 +17,12 @@ import org.studyplatform.courseservice.repository.CourseItemRepository;
 import org.studyplatform.courseservice.repository.CourseItemTestCaseRepository;
 import org.studyplatform.courseservice.repository.CourseModuleRepository;
 import org.studyplatform.courseservice.repository.CourseRepository;
+import org.studyplatform.courseservice.entity.Course;
+import org.studyplatform.courseservice.entity.enums.CourseAccessType;
+import org.studyplatform.courseservice.entity.enums.CourseDifficulty;
+import org.studyplatform.courseservice.entity.enums.CourseStatus;
+
+import java.time.Instant;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
@@ -32,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@WithMockUser(roles = "TEACHER")
+@WithMockUser(username = "1", roles = "TEACHER")
 class AdminCourseControllerIntegrationTest {
 
     @Autowired
@@ -90,6 +96,58 @@ class AdminCourseControllerIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "2", roles = "TEACHER")
+    void shouldRejectTeacherCreatingCourseForAnotherUser() throws Exception {
+        String request = """
+                {
+                  "slug": "foreign-owner-course-%s",
+                  "title": "Foreign Owner Course",
+                  "createdByUserId": 1
+                }
+                """.formatted(System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "2", roles = "TEACHER")
+    void shouldRejectTeacherUpdatingAnotherTeacherCourse() throws Exception {
+        Course course = seedCourse(1L, "ownership-denied-" + System.nanoTime());
+
+        String request = """
+                {
+                  "title": "Illegal update"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/courses/{courseId}", course.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "2", roles = "ADMIN")
+    void shouldAllowAdminUpdatingAnyCourse() throws Exception {
+        Course course = seedCourse(1L, "admin-override-" + System.nanoTime());
+
+        String request = """
+                {
+                  "title": "Admin update"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/courses/{courseId}", course.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Admin update"));
+    }
+
+    @Test
     void shouldCreateAndPublishCourseWithEditableContent() throws Exception {
         Long courseId = createCourse();
         Long moduleId = createModule(courseId);
@@ -141,6 +199,22 @@ class AdminCourseControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+
+    private Course seedCourse(Long ownerId, String slug) {
+        return courseRepository.save(Course.builder()
+                .slug(slug)
+                .title("Seeded course")
+                .shortDescription("Seeded course for ownership tests.")
+                .description("Seeded course for ownership tests.")
+                .difficulty(CourseDifficulty.BEGINNER)
+                .status(CourseStatus.DRAFT)
+                .accessType(CourseAccessType.PUBLIC)
+                .enrollmentEnabled(true)
+                .estimatedMinutes(30)
+                .createdByUserId(ownerId)
+                .publishedAt(Instant.now())
+                .build());
+    }
 
     private String minimalCreateCourseRequest(String slug) {
         return """

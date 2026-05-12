@@ -1,6 +1,7 @@
 package org.studyplatform.courseservice.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.studyplatform.courseservice.dto.admin.AdminCourseItemResponse;
@@ -62,6 +63,7 @@ public class CourseAdminService {
     private final AdminCourseMapper mapper;
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canCreateCourseFor(#request.createdByUserId())")
     public AdminCourseResponse createCourse(CreateCourseRequest request) {
         String slug = normalizeSlug(request.slug());
 
@@ -88,6 +90,7 @@ public class CourseAdminService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminCourseResponse getCourse(Long courseId) {
         Course course = getCourseOrThrow(courseId);
         List<CourseModule> modules = moduleRepository.findByCourseIdOrderByOrderIndexAsc(courseId);
@@ -99,6 +102,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminCourseResponse updateCourse(Long courseId, UpdateCourseRequest request) {
         Course course = getCourseOrThrow(courseId);
 
@@ -147,6 +151,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminCourseResponse publishCourse(Long courseId) {
         Course course = getCourseOrThrow(courseId);
         course.setStatus(CourseStatus.PUBLISHED);
@@ -160,6 +165,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminCourseResponse archiveCourse(Long courseId) {
         Course course = getCourseOrThrow(courseId);
         course.setStatus(CourseStatus.ARCHIVED);
@@ -168,6 +174,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminModuleResponse createModule(Long courseId, CreateModuleRequest request) {
         Course course = getCourseOrThrow(courseId);
 
@@ -183,6 +190,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageModule(#moduleId)")
     public AdminModuleResponse updateModule(Long moduleId, UpdateModuleRequest request) {
         CourseModule module = getModuleOrThrow(moduleId);
 
@@ -204,6 +212,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageModule(#moduleId)")
     public void deleteModule(Long moduleId) {
         CourseModule module = getModuleOrThrow(moduleId);
         List<CourseItem> items = itemRepository.findByModuleIdOrderByOrderIndexAsc(moduleId);
@@ -217,6 +226,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageModule(#moduleId)")
     public AdminCourseItemResponse createItem(Long moduleId, CreateCourseItemRequest request) {
         CourseModule module = getModuleOrThrow(moduleId);
 
@@ -243,12 +253,14 @@ public class CourseAdminService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse getItem(Long itemId) {
         CourseItem item = getItemOrThrow(itemId);
         return mapFullItem(item);
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse updateItem(Long itemId, UpdateCourseItemRequest request) {
         CourseItem item = getItemOrThrow(itemId);
 
@@ -313,6 +325,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public void deleteItem(Long itemId) {
         CourseItem item = getItemOrThrow(itemId);
         deleteItemChildren(itemId);
@@ -320,6 +333,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceContentBlocks(Long itemId, ReplaceContentBlocksRequest request) {
         CourseItem item = getItemOrThrow(itemId);
 
@@ -336,6 +350,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceHints(Long itemId, ReplaceHintsRequest request) {
         CourseItem item = getItemOrThrow(itemId);
 
@@ -352,6 +367,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceTestCases(Long itemId, ReplaceTestCasesRequest request) {
         CourseItem item = getItemOrThrow(itemId);
 
@@ -368,6 +384,7 @@ public class CourseAdminService {
     }
 
     @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceOptions(Long itemId, ReplaceQuizOptionsRequest request) {
         CourseItem item = getItemOrThrow(itemId);
 
