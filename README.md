@@ -318,6 +318,14 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
+Until BFF/reverse proxy is ready, `docker-compose.yml` intentionally exposes CourseService directly for team Swagger checks:
+
+```text
+http://<vps-ip>:8082/swagger-ui.html
+```
+
+This is temporary. In the full platform deployment, public traffic should enter through BFF/reverse proxy and the direct CourseService port mapping should be removed or restricted.
+
 Health checks:
 
 ```powershell

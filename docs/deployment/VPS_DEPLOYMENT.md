@@ -80,6 +80,14 @@ COURSE_SERVICE_JWT_ROLE_PREFIX=ROLE_
 SPRING_PROFILES_ACTIVE=prod
 ```
 
+`COURSE_SERVICE_PORT` is currently a temporary external host port for direct team access while BFF/reverse proxy is not ready:
+
+```text
+http://<vps-ip>:8082/swagger-ui.html
+```
+
+The application container still listens on `8082`. In the full platform deployment, public traffic should enter through BFF/reverse proxy and direct CourseService exposure should be removed or restricted.
+
 Do not put UserService private keys into CourseService.
 
 ## 5. Start Service
