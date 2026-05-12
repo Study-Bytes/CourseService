@@ -1,6 +1,7 @@
 package org.studyplatform.courseservice.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.studyplatform.courseservice.config.OpenApiConfig;
 import org.studyplatform.courseservice.dto.admin.AdminCourseItemResponse;
 import org.studyplatform.courseservice.dto.admin.AdminCourseResponse;
 import org.studyplatform.courseservice.dto.admin.AdminModuleResponse;
@@ -33,6 +35,7 @@ import org.studyplatform.courseservice.service.CourseAdminService;
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 @Tag(name = "Admin Course API", description = "Teacher/admin API for creating and editing course content")
+@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH_SCHEME)
 public class AdminCourseController {
 
     private final CourseAdminService adminService;

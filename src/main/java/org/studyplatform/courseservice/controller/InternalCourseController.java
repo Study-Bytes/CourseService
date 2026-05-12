@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.studyplatform.courseservice.config.OpenApiConfig;
 import org.studyplatform.courseservice.dto.internal.ExecutionPackageResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseAvailabilityResponse;
 import org.studyplatform.courseservice.service.CourseInternalService;
@@ -18,7 +19,7 @@ import org.studyplatform.courseservice.service.CourseInternalService;
 @RestController
 @RequestMapping("/api/v1/internal")
 @Tag(name = "Internal Course API", description = "Trusted backend endpoints for LearningService and BFF integrations")
-@SecurityRequirement(name = "internalApiKey")
+@SecurityRequirement(name = OpenApiConfig.INTERNAL_API_KEY_SCHEME)
 public class InternalCourseController {
 
     private final CourseInternalService courseInternalService;
