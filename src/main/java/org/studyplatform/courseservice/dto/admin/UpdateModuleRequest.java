@@ -1,0 +1,13 @@
+package org.studyplatform.courseservice.dto.admin;
+
+import jakarta.validation.constraints.Size;
+
+public record UpdateModuleRequest(
+        @Size(max = 200)
+        String title,
+
+        String description,
+
+        Integer orderIndex
+) {
+}
