@@ -1,0 +1,59 @@
+services:
+  course-postgres:
+    image: postgres:16
+    container_name: course-service-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${COURSE_SERVICE_DB_NAME:-course_service}
+      POSTGRES_USER: ${COURSE_SERVICE_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${COURSE_SERVICE_DB_PASSWORD:-postgres}
+    volumes:
+      - course_postgres_data:/var/lib/postgresql/data
+    networks:
+      - course_db_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COURSE_SERVICE_DB_USERNAME:-postgres} -d ${COURSE_SERVICE_DB_NAME:-course_service}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  course-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: studybytes/course-service:local
+    container_name: course-service
+    restart: unless-stopped
+    depends_on:
+      course-postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: ${COURSE_SERVICE_PORT:-8082}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      COURSE_SERVICE_DB_URL: ${COURSE_SERVICE_DB_URL:-jdbc:postgresql://course-postgres:5432/course_service}
+      COURSE_SERVICE_DB_USERNAME: ${COURSE_SERVICE_DB_USERNAME:-postgres}
+      COURSE_SERVICE_DB_PASSWORD: ${COURSE_SERVICE_DB_PASSWORD:-postgres}
+      COURSE_SERVICE_INTERNAL_API_KEY: ${COURSE_SERVICE_INTERNAL_API_KEY:-dev-course-service-internal-key}
+      COURSE_SERVICE_PORT: ${COURSE_SERVICE_PORT:-8082}
+      USER_SERVICE_JWT_ISSUER_URI: ${USER_SERVICE_JWT_ISSUER_URI:-http://user-service:8081}
+      USER_SERVICE_JWT_JWK_SET_URI: ${USER_SERVICE_JWT_JWK_SET_URI:-http://user-service:8081/api/v1/auth/.well-known/jwks.json}
+      USER_SERVICE_JWT_AUDIENCE: ${USER_SERVICE_JWT_AUDIENCE:-study-platform}
+      COURSE_SERVICE_JWT_ROLES_CLAIM: ${COURSE_SERVICE_JWT_ROLES_CLAIM:-roles}
+      COURSE_SERVICE_JWT_ROLE_PREFIX: ${COURSE_SERVICE_JWT_ROLE_PREFIX:-ROLE_}
+    ports:
+      - "${COURSE_SERVICE_PORT:-8082}:${COURSE_SERVICE_PORT:-8082}"
+    networks:
+      - course_backend_net
+      - course_db_net
+
+networks:
+  course_backend_net:
+    name: ${COURSE_BACKEND_NETWORK:-studybytes_backend_net}
+    external: true
+  course_db_net:
+    name: ${COURSE_DB_NETWORK:-course_db_net}
+    external: true
+
+volumes:
+  course_postgres_data:
+    name: course_postgres_data

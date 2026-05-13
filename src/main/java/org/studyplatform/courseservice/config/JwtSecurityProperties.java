@@ -5,17 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.security.jwt")
 public class JwtSecurityProperties {
 
-    private String secret;
     private String rolesClaim = "roles";
     private String rolePrefix = "ROLE_";
-
-    public String getSecret() {
-        return secret;
-    }
-
-    public void setSecret(String secret) {
-        this.secret = secret;
-    }
 
     public String getRolesClaim() {
         return rolesClaim;

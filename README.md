@@ -63,7 +63,7 @@ Course
 
 ## Public API
 
-Public read endpoints expose only safe course preview data.
+Public read endpoints expose only safe public data.
 
 ```http
 GET /api/v1/courses
@@ -71,20 +71,11 @@ GET /api/v1/courses/{courseId}
 GET /api/v1/course-items/{itemId}
 ```
 
-`GET /api/v1/courses/{courseId}` returns course metadata, module summaries and item summaries.
-
-`GET /api/v1/course-items/{itemId}` returns item preview only: identifiers, title, type, language and order. It does not return full lesson content.
-
 Public responses must not expose:
 
-- full content blocks;
-- starter code;
-- hints;
-- tests;
 - hidden tests;
 - expected output;
-- correct quiz answers;
-- quiz explanations.
+- correct quiz answers.
 
 ## Admin API
 
@@ -143,27 +134,6 @@ PUT /api/v1/admin/course-items/{itemId}/options
 
 These endpoints replace the whole child collection for a course item. This is simpler for an MVP course editor: the frontend/BFF sends the current list as the source of truth.
 
-### Admin ownership model
-
-Admin endpoints use role-level and object-level checks.
-
-```text
-ADMIN   -> can manage every course
-TEACHER -> can manage only courses where Course.createdByUserId == JWT.sub
-STUDENT -> no admin access
-```
-
-Ownership is checked for:
-
-- course operations;
-- module operations;
-- course item operations;
-- content block replacement;
-- hint replacement;
-- test case replacement;
-- quiz option replacement.
-
-A `TEACHER` cannot create a course for another user id. `createdByUserId` must match the JWT `sub` value, unless the caller has `ADMIN` role.
 
 
 ## Internal API
@@ -182,33 +152,6 @@ Configured in `application.properties`:
 ```properties
 app.internal-api-key=dev-course-service-internal-key
 ```
-
-### Student-safe item content
-
-```http
-GET /api/v1/internal/course-items/{itemId}/content
-```
-
-This endpoint is intended for BFF/LearningService after enrollment checks.
-
-It returns:
-
-- statement;
-- starter code;
-- content blocks;
-- open tests only;
-- hints;
-- quiz options without correct flags;
-- execution limits;
-- execution policy;
-- evaluation policy.
-
-It does not return:
-
-- hidden tests;
-- expected outputs;
-- correct quiz answers;
-- quiz explanations.
 
 ### Execution package
 
@@ -255,31 +198,31 @@ CourseService separates public, admin and internal access:
 /health, /ready                  -> public
 /swagger-ui.html, /swagger-ui/** -> public in the current dev configuration
 /v3/api-docs, /v3/api-docs.yaml  -> public in the current dev configuration
-/api/v1/courses/**               -> public preview API
-/api/v1/course-items/**          -> public item preview API only
-/api/v1/admin/**                 -> Bearer JWT with TEACHER or ADMIN role + ownership checks
+/api/v1/courses/**               -> public read API
+/api/v1/course-items/**          -> public read API
+/api/v1/admin/**                 -> Bearer JWT with TEACHER or ADMIN role
 /api/v1/internal/**              -> X-Internal-Api-Key
 ```
 
-JWT configuration:
+JWT verification configuration:
 
 ```properties
-app.security.jwt.secret=dev-course-service-jwt-secret-key-which-is-at-least-32-bytes-long
-app.security.jwt.roles-claim=roles
-app.security.jwt.role-prefix=ROLE_
+spring.security.oauth2.resourceserver.jwt.issuer-uri=${USER_SERVICE_JWT_ISSUER_URI:http://user-service:8081}
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${USER_SERVICE_JWT_JWK_SET_URI:http://user-service:8081/api/v1/auth/.well-known/jwks.json}
+spring.security.oauth2.resourceserver.jwt.audiences=${USER_SERVICE_JWT_AUDIENCE:study-platform}
+app.security.jwt.roles-claim=${COURSE_SERVICE_JWT_ROLES_CLAIM:roles}
+app.security.jwt.role-prefix=${COURSE_SERVICE_JWT_ROLE_PREFIX:ROLE_}
 ```
+
+UserService owns the private signing key. CourseService verifies access tokens through UserService JWKS/public keys and must not store the private key or a shared JWT secret.
 
 Internal API configuration:
 
 ```properties
-app.internal-api-key=dev-course-service-internal-key
+app.internal-api-key=${COURSE_SERVICE_INTERNAL_API_KEY:dev-course-service-internal-key}
 ```
 
-Public endpoints must never expose hidden tests, expected outputs, full item content or correct quiz answers.
-
-Internal content endpoints may expose enrolled-student-safe item content to trusted backend services.
-
-Internal execution endpoints may expose hidden tests and expected outputs only to LearningService or trusted execution flows.
+Public endpoints must never expose hidden tests, expected outputs or correct quiz answers. Internal endpoints may expose hidden tests and expected outputs only to trusted backend services.
 
 ## Swagger/OpenAPI
 
@@ -343,6 +286,45 @@ docker run --name course-service-postgres `
 
 Reset is useful after entity field renames because `spring.jpa.hibernate.ddl-auto=update` may keep old columns.
 
+## Deployment
+
+CourseService deployment runs the application container with a dedicated PostgreSQL container. Inside Docker Compose, CourseService connects to PostgreSQL by service name, not `localhost`:
+
+```properties
+COURSE_SERVICE_DB_URL=jdbc:postgresql://course-postgres:5432/course_service
+```
+
+This compose file expects external networks. Create them once before startup:
+
+```powershell
+docker network create studybytes_backend_net
+docker network create --internal course_db_net
+```
+
+Local compose startup:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+Health checks:
+
+```powershell
+irm http://localhost:8082/health
+irm http://localhost:8082/ready
+irm http://localhost:8082/api/v1/courses | ConvertTo-Json -Depth 20
+```
+
+The repository keeps only `.env.example`. Real `.env` files, private keys and secrets must stay outside Git.
+
+Detailed deployment and integration guides:
+
+- [BFF integration](docs/integration/BFF_USAGE.md)
+- [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
+- [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
+- [VPS deployment](docs/deployment/VPS_DEPLOYMENT.md)
+
 ## Run
 
 Default profile:
@@ -375,7 +357,6 @@ Run OpenAPI generation:
 irm http://localhost:8082/api/v1/courses
 irm http://localhost:8082/api/v1/courses/1
 irm http://localhost:8082/api/v1/course-items/1
-irm http://localhost:8082/api/v1/internal/course-items/2/content -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 ```
 
 Check admin API:
@@ -391,66 +372,66 @@ PowerShell does not support raw `GET http://...` syntax. Use `irm` or Postman.
 Check internal API:
 
 ```powershell
-irm http://localhost:8082/api/v1/internal/course-items/2/content -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 irm http://localhost:8082/api/v1/internal/course-items/2/execution-package -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 irm http://localhost:8082/api/v1/internal/courses/1/availability -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 ```
 
 ## Integration notes
 
-### Site
-
 Site should normally call BFF, not CourseService directly. CourseService public DTOs are still useful as contract references for course catalog, course page and item page UI models.
 
-### BFF
+Detailed integration guides:
 
-BFF should aggregate:
-
-- CourseService course structure;
-- LearningService user enrollment/progress;
-- UserService current user/profile data.
-
-### LearningService
-
-LearningService checks enrollment before requesting full course content.
-
-Expected enrolled-content flow:
-
-```text
-Site -> BFF -> LearningService checks enrollment -> CourseService internal content API -> BFF -> Site
-```
-
-Expected execution flow:
-
-```text
-Site -> BFF -> LearningService checks enrollment/attempt rules -> CourseService execution package API -> CodeExecutorService -> LearningService saves attempt/progress
-```
-
-LearningService should reference CourseService entities by ids:
-
-- `courseId`
-- `moduleId`
-- `itemId`
-
-LearningService owns:
-
-- enrollment;
-- progress;
-- attempts;
-- user item status;
-- best result;
-- aggregated course progress.
-
-CourseService does not duplicate that state.
-
-### CodeExecutorService
-
-CodeExecutorService should not call CourseService directly in the normal flow. LearningService will later request execution package data from CourseService internal API and send technical execution requests to CodeExecutorService.
+- [BFF integration](docs/integration/BFF_USAGE.md)
+- [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
+- [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
 
 ## Next planned tasks
 
-- Prepare deployment/secrets/network guide.
-- Add Docker/deployment configuration.
+- Add Flyway migrations and switch production `ddl-auto` to `validate`.
 - Add CI/CD pipeline.
-- Add Flyway database migrations.
-- Expand integration and contract tests.
+- Add contract tests for BFF and LearningService integration.
+
+
+## JWT verification model
+
+CourseService does not issue JWT tokens and must not store the UserService private key.
+
+Target platform authentication flow:
+
+```text
+UserService signs access JWT with RS256 private key.
+CourseService verifies access JWT using UserService public JWKS endpoint.
+```
+
+CourseService expects UserService JWT tokens to contain:
+
+```json
+{
+  "iss": "study-platform-user-service",
+  "sub": "123",
+  "aud": ["study-platform"],
+  "roles": ["TEACHER"]
+}
+```
+
+CourseService configuration:
+
+```properties
+spring.security.oauth2.resourceserver.jwt.issuer-uri=${USER_SERVICE_JWT_ISSUER_URI:http://user-service:8081}
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${USER_SERVICE_JWT_JWK_SET_URI:http://user-service:8081/api/v1/auth/.well-known/jwks.json}
+spring.security.oauth2.resourceserver.jwt.audiences=${USER_SERVICE_JWT_AUDIENCE:study-platform}
+app.security.jwt.roles-claim=${COURSE_SERVICE_JWT_ROLES_CLAIM:roles}
+app.security.jwt.role-prefix=${COURSE_SERVICE_JWT_ROLE_PREFIX:ROLE_}
+```
+
+Rules:
+
+- UserService owns the private signing key.
+- CourseService uses only JWKS/public key verification.
+- CourseService never receives or stores the UserService private key.
+- `TEACHER` and `ADMIN` roles are read from the `roles` claim.
+- For `TEACHER`, CourseService additionally checks ownership: `Course.createdByUserId == JWT.sub`.
+- Internal endpoints still use `X-Internal-Api-Key` and do not rely on user JWT.
+
+When UserService is not running locally, public endpoints and internal API key endpoints can still be checked. Admin endpoints that require real Bearer JWT need a token issued by UserService.
