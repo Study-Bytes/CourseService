@@ -70,10 +70,12 @@ For local development and temporary VPS Nginx proxying, `docker-compose.yml` map
 127.0.0.1:8082 -> course-service:8082
 ```
 
-Temporary public Swagger URL through Nginx:
+Public development URLs through Nginx:
 
 ```text
 https://dev-api.studybytes.ru/course-service/swagger-ui.html
+https://dev-api.studybytes.ru/course-service/v3/api-docs
+https://dev-api.studybytes.ru/course-service/api/v1/courses
 ```
 
 Direct external access to `http://<vps-ip>:8082` should not work. Remove this CourseService-specific mapping or keep it localhost-only when BFF/reverse proxy becomes the platform entry point.
@@ -84,7 +86,7 @@ The production Spring profile uses:
 server.forward-headers-strategy=framework
 ```
 
-Nginx should forward `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix` so Swagger and OpenAPI links match the public URL.
+Nginx should forward `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix` so Swagger and OpenAPI links match the public URL. The external `/course-service` prefix is a gateway prefix; CourseService still receives requests on paths such as `/api/v1/courses` inside the container.
 
 ## Environment Files
 

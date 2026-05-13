@@ -18,6 +18,14 @@ For local host checks:
 http://localhost:8082
 ```
 
+Temporary public development gateway:
+
+```text
+https://dev-api.studybytes.ru/course-service
+```
+
+Use the Docker backend URL for service-to-service traffic. The public gateway URL is for browser, Swagger and external manual checks.
+
 ## Public Course Data
 
 BFF can use public CourseService endpoints without authentication for catalog and preview pages:

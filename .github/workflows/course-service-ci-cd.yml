@@ -64,13 +64,22 @@ jobs:
         run: ./mvnw -B clean test
 
       - name: Generate local OpenAPI contract
-        run: ./mvnw -B verify -Popenapi
+        run: ./mvnw -B -DskipTests verify -Popenapi
 
       - name: Check OpenAPI contract is committed
         run: git diff --exit-code docs/openapi/course-service-openapi.yaml
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image
-        run: docker build -t studybytes/course-service:ci .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: studybytes/course-service:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy CourseService to VPS

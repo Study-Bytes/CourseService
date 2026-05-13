@@ -4,8 +4,12 @@ info:
   description: Course content and structure service API.
   version: v1
 servers:
+- url: https://dev-api.studybytes.ru/course-service
+  description: Development gateway through Nginx
 - url: http://localhost:8082
-  description: Generated server url
+  description: Local direct access
+- url: http://course-service:8082
+  description: Docker backend network
 tags:
 - name: System
   description: Technical health and readiness checks

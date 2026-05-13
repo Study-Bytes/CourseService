@@ -227,7 +227,15 @@ Public endpoints must never expose hidden tests, expected outputs or correct qui
 
 ## Swagger/OpenAPI
 
-Runtime docs:
+Runtime docs through the development Nginx gateway:
+
+```text
+https://dev-api.studybytes.ru/course-service/swagger-ui.html
+https://dev-api.studybytes.ru/course-service/v3/api-docs
+https://dev-api.studybytes.ru/course-service/v3/api-docs.yaml
+```
+
+Local direct runtime docs:
 
 ```text
 http://localhost:8082/swagger-ui.html
@@ -415,12 +423,22 @@ server.forward-headers-strategy=framework
 
 Nginx should pass `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix` when serving CourseService under `/course-service`.
 
+Public development gateway:
+
+```text
+https://dev-api.studybytes.ru/course-service
+```
+
 Health checks:
 
 ```powershell
 irm http://localhost:8082/health
 irm http://localhost:8082/ready
 irm http://localhost:8082/api/v1/courses | ConvertTo-Json -Depth 20
+
+irm https://dev-api.studybytes.ru/course-service/health
+irm https://dev-api.studybytes.ru/course-service/ready
+irm https://dev-api.studybytes.ru/course-service/api/v1/courses | ConvertTo-Json -Depth 20
 ```
 
 The repository keeps only `.env.example`. Real `.env` files, private keys and secrets must stay outside Git.
@@ -464,6 +482,17 @@ The Maven `openapi` profile starts the app with Spring profiles `dev,openapi`. T
 
 ## Manual API checks
 
+Public development gateway:
+
+```powershell
+$courseServiceUrl = "https://dev-api.studybytes.ru/course-service"
+irm "$courseServiceUrl/api/v1/courses"
+irm "$courseServiceUrl/api/v1/courses/1"
+irm "$courseServiceUrl/api/v1/course-items/1"
+```
+
+Local direct access:
+
 ```powershell
 irm http://localhost:8082/api/v1/courses
 irm http://localhost:8082/api/v1/courses/1
@@ -475,6 +504,9 @@ Check admin API:
 ```powershell
 irm http://localhost:8082/api/v1/admin/courses/1
 irm http://localhost:8082/api/v1/admin/course-items/1
+
+irm "$courseServiceUrl/api/v1/admin/courses/1"
+irm "$courseServiceUrl/api/v1/admin/course-items/1"
 ```
 
 PowerShell does not support raw `GET http://...` syntax. Use `irm` or Postman.
@@ -485,6 +517,9 @@ Check internal API:
 ```powershell
 irm http://localhost:8082/api/v1/internal/course-items/2/execution-package -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 irm http://localhost:8082/api/v1/internal/courses/1/availability -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
+
+irm "$courseServiceUrl/api/v1/internal/course-items/2/execution-package" -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
+irm "$courseServiceUrl/api/v1/internal/courses/1/availability" -Headers @{"X-Internal-Api-Key"="dev-course-service-internal-key"} | ConvertTo-Json -Depth 20
 ```
 
 ## Integration notes
