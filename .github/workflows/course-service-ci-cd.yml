@@ -60,8 +60,8 @@ jobs:
       - name: Make Maven wrapper executable
         run: chmod +x ./mvnw
 
-      - name: Run tests
-        run: ./mvnw -B clean test
+      - name: Run tests and coverage
+        run: ./mvnw -B clean verify
 
       - name: Generate local OpenAPI contract
         run: ./mvnw -B -DskipTests verify -Popenapi
@@ -127,6 +127,7 @@ jobs:
           ssh -i ~/.ssh/course_service_deploy_key -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
             "set -euo pipefail
              cd '$VPS_DEPLOY_PATH'
+             git config --global --add safe.directory '$VPS_DEPLOY_PATH'
              test -f .env || (echo '.env is missing on VPS. Create it before deployment.' && exit 1)
              git fetch origin main
              git checkout main

@@ -509,9 +509,36 @@ Dev profile:
 
 ## Test
 
+Run the full CourseService test suite:
+
 ```powershell
 .\mvnw.cmd clean test
 ```
+
+Run tests plus verification phases and generate the JaCoCo coverage report:
+
+```powershell
+.\mvnw.cmd clean verify
+```
+
+Coverage report output:
+
+```text
+target/site/jacoco/index.html
+```
+
+The current test suite covers the critical CourseService contracts:
+
+- public course catalog/details/item preview safety;
+- admin course listing, filtering and ownership rules;
+- course/module/item editor flows;
+- module and item reorder validation;
+- `orderIndex` and duplicate-order validation;
+- `CourseItemType` business validation;
+- publish-time validation;
+- internal API key protection;
+- execution package contract for LearningService;
+- JWT/JWKS validation and admin ownership checks.
 
 Run OpenAPI generation:
 
@@ -576,7 +603,7 @@ Detailed integration guides:
 
 ## Next planned tasks
 
-- Add contract tests for BFF and LearningService integration.
+- Start LearningService implementation and cover CourseService/LearningService contract behavior during integration.
 
 
 ## JWT verification model
