@@ -124,4 +124,12 @@ jobs:
              git pull --ff-only origin main
              docker compose up -d --build
              docker compose ps
-             curl -f --retry 20 --retry-delay 3 --retry-connrefused http://localhost:8082/health"
+             for attempt in \$(seq 1 40); do
+               if curl -fsS http://127.0.0.1:8082/health; then
+                 exit 0
+               fi
+               echo \"Waiting for CourseService health check... attempt \$attempt/40\"
+               sleep 3
+             done
+             docker compose logs --tail=200 course-service
+             exit 1"
