@@ -12,16 +12,20 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.studyplatform.courseservice.config.OpenApiConfig;
 import org.studyplatform.courseservice.dto.admin.AdminCourseItemResponse;
+import org.studyplatform.courseservice.dto.admin.AdminCoursePageResponse;
 import org.studyplatform.courseservice.dto.admin.AdminCourseResponse;
 import org.studyplatform.courseservice.dto.admin.AdminModuleResponse;
 import org.studyplatform.courseservice.dto.admin.CreateCourseItemRequest;
 import org.studyplatform.courseservice.dto.admin.CreateCourseRequest;
 import org.studyplatform.courseservice.dto.admin.CreateModuleRequest;
+import org.studyplatform.courseservice.dto.admin.ReorderItemsRequest;
+import org.studyplatform.courseservice.dto.admin.ReorderModulesRequest;
 import org.studyplatform.courseservice.dto.admin.ReplaceContentBlocksRequest;
 import org.studyplatform.courseservice.dto.admin.ReplaceHintsRequest;
 import org.studyplatform.courseservice.dto.admin.ReplaceQuizOptionsRequest;
@@ -30,6 +34,9 @@ import org.studyplatform.courseservice.dto.admin.UpdateCourseItemRequest;
 import org.studyplatform.courseservice.dto.admin.UpdateCourseRequest;
 import org.studyplatform.courseservice.dto.admin.UpdateModuleRequest;
 import org.studyplatform.courseservice.service.CourseAdminService;
+import org.studyplatform.courseservice.entity.enums.CourseAccessType;
+import org.studyplatform.courseservice.entity.enums.CourseDifficulty;
+import org.studyplatform.courseservice.entity.enums.CourseStatus;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -39,6 +46,19 @@ import org.studyplatform.courseservice.service.CourseAdminService;
 public class AdminCourseController {
 
     private final CourseAdminService adminService;
+
+    @GetMapping("/courses")
+    @Operation(summary = "List admin courses", description = "Returns courses visible to the current admin or teacher with filtering and pagination.")
+    public AdminCoursePageResponse listCourses(
+            @RequestParam(required = false) CourseStatus status,
+            @RequestParam(required = false) CourseDifficulty difficulty,
+            @RequestParam(required = false) CourseAccessType accessType,
+            @RequestParam(required = false) Long createdByUserId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return adminService.listCourses(status, difficulty, accessType, createdByUserId, page, size);
+    }
 
     @PostMapping("/courses")
     @ResponseStatus(HttpStatus.CREATED)
@@ -84,6 +104,15 @@ public class AdminCourseController {
         return adminService.createModule(courseId, request);
     }
 
+    @PutMapping("/courses/{courseId}/modules/reorder")
+    @Operation(summary = "Reorder modules", description = "Rewrites module order indexes for the whole course.")
+    public AdminCourseResponse reorderModules(
+            @PathVariable Long courseId,
+            @Valid @RequestBody ReorderModulesRequest request
+    ) {
+        return adminService.reorderModules(courseId, request);
+    }
+
     @PutMapping("/modules/{moduleId}")
     @Operation(summary = "Update module", description = "Updates module metadata and order.")
     public AdminModuleResponse updateModule(
@@ -98,6 +127,15 @@ public class AdminCourseController {
     @Operation(summary = "Delete module", description = "Deletes a module and all its course items.")
     public void deleteModule(@PathVariable Long moduleId) {
         adminService.deleteModule(moduleId);
+    }
+
+    @PutMapping("/modules/{moduleId}/items/reorder")
+    @Operation(summary = "Reorder course items", description = "Rewrites item order indexes for the whole module.")
+    public AdminModuleResponse reorderItems(
+            @PathVariable Long moduleId,
+            @Valid @RequestBody ReorderItemsRequest request
+    ) {
+        return adminService.reorderItems(moduleId, request);
     }
 
     @PostMapping("/modules/{moduleId}/items")

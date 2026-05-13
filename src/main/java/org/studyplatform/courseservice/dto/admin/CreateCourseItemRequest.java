@@ -23,6 +23,7 @@ public record CreateCourseItemRequest(
         String language,
 
         @NotNull
+        @Min(0)
         Integer orderIndex,
 
         @Min(1)

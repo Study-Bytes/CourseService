@@ -18,13 +18,18 @@ import org.studyplatform.courseservice.repository.CourseItemTestCaseRepository;
 import org.studyplatform.courseservice.repository.CourseModuleRepository;
 import org.studyplatform.courseservice.repository.CourseRepository;
 import org.studyplatform.courseservice.entity.Course;
+import org.studyplatform.courseservice.entity.CourseItem;
+import org.studyplatform.courseservice.entity.CourseModule;
 import org.studyplatform.courseservice.entity.enums.CourseAccessType;
 import org.studyplatform.courseservice.entity.enums.CourseDifficulty;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
+import org.studyplatform.courseservice.entity.enums.CourseItemType;
+import org.studyplatform.courseservice.entity.enums.ComparisonMode;
 
 import java.time.Instant;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -156,7 +161,6 @@ class AdminCourseControllerIntegrationTest {
         replaceContentBlocks(itemId);
         replaceHints(itemId);
         replaceTestCases(itemId);
-        replaceOptions(itemId);
 
         mockMvc.perform(post("/api/v1/admin/courses/{courseId}/publish", courseId))
                 .andExpect(status().isOk())
@@ -168,10 +172,183 @@ class AdminCourseControllerIntegrationTest {
                 .andExpect(jsonPath("$.contentBlocks", hasSize(1)))
                 .andExpect(jsonPath("$.hints", hasSize(1)))
                 .andExpect(jsonPath("$.testCases", hasSize(2)))
-                .andExpect(jsonPath("$.options", hasSize(2)))
+                .andExpect(jsonPath("$.options", hasSize(0)))
                 .andExpect(jsonPath("$.testCases[1].visibility").value("HIDDEN"))
-                .andExpect(jsonPath("$.testCases[1].expectedOutput").value("25\n"))
-                .andExpect(jsonPath("$.options[0].correct").value(true));
+                .andExpect(jsonPath("$.testCases[1].expectedOutput").value("25\n"));
+    }
+
+    @Test
+    void shouldListOnlyOwnCoursesForTeacher() throws Exception {
+        seedCourse(1L, "teacher-owned-" + System.nanoTime());
+        seedCourse(2L, "another-teacher-" + System.nanoTime());
+
+        mockMvc.perform(get("/api/v1/admin/courses"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].createdByUserId").value(1));
+    }
+
+    @Test
+    @WithMockUser(username = "2", roles = "ADMIN")
+    void shouldListAllCoursesForAdmin() throws Exception {
+        seedCourse(1L, "admin-list-a-" + System.nanoTime());
+        seedCourse(2L, "admin-list-b-" + System.nanoTime());
+
+        mockMvc.perform(get("/api/v1/admin/courses")
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void shouldReorderModules() throws Exception {
+        Long courseId = createCourse("module-reorder-" + System.nanoTime());
+        Long firstModuleId = createModule(courseId, "First", 0);
+        Long secondModuleId = createModule(courseId, "Second", 1);
+
+        String request = """
+                {
+                  "orderedModuleIds": [%d, %d]
+                }
+                """.formatted(secondModuleId, firstModuleId);
+
+        mockMvc.perform(put("/api/v1/admin/courses/{courseId}/modules/reorder", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modules[0].id").value(secondModuleId))
+                .andExpect(jsonPath("$.modules[0].orderIndex").value(0))
+                .andExpect(jsonPath("$.modules[1].id").value(firstModuleId))
+                .andExpect(jsonPath("$.modules[1].orderIndex").value(1));
+    }
+
+    @Test
+    void shouldRejectReorderModulesWithMissingId() throws Exception {
+        Long courseId = createCourse("module-reorder-invalid-" + System.nanoTime());
+        Long firstModuleId = createModule(courseId, "First", 0);
+        createModule(courseId, "Second", 1);
+
+        String request = """
+                {
+                  "orderedModuleIds": [%d]
+                }
+                """.formatted(firstModuleId);
+
+        mockMvc.perform(put("/api/v1/admin/courses/{courseId}/modules/reorder", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("missing existing IDs")));
+    }
+
+    @Test
+    void shouldReorderItems() throws Exception {
+        Long courseId = createCourse("item-reorder-" + System.nanoTime());
+        Long moduleId = createModule(courseId, "Practice", 0);
+        Long firstItemId = createCodingItem(moduleId, "First", 0);
+        Long secondItemId = createCodingItem(moduleId, "Second", 1);
+
+        String request = """
+                {
+                  "orderedItemIds": [%d, %d]
+                }
+                """.formatted(secondItemId, firstItemId);
+
+        mockMvc.perform(put("/api/v1/admin/modules/{moduleId}/items/reorder", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(secondItemId))
+                .andExpect(jsonPath("$.items[0].orderIndex").value(0))
+                .andExpect(jsonPath("$.items[1].id").value(firstItemId))
+                .andExpect(jsonPath("$.items[1].orderIndex").value(1));
+    }
+
+    @Test
+    void shouldRejectPublishingCourseWithoutModules() throws Exception {
+        Long courseId = createCourse("publish-no-modules-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/publish", courseId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Course must contain at least one module")));
+    }
+
+    @Test
+    void shouldRejectPublishingQuizWithoutCorrectOption() throws Exception {
+        Long courseId = createCourse("quiz-no-correct-" + System.nanoTime());
+        Long moduleId = createModule(courseId, "Quiz", 0);
+        Long quizItemId = createQuizItem(moduleId, "Quiz item", 0);
+
+        String optionsRequest = """
+                {
+                  "options": [
+                    {
+                      "orderIndex": 0,
+                      "label": "A",
+                      "text": "Wrong answer",
+                      "correct": false
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/course-items/{itemId}/options", quizItemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(optionsRequest))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/publish", courseId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("must contain at least one correct option")));
+    }
+
+    @Test
+    void shouldNotDefaultLanguageForTheoryItem() throws Exception {
+        Long courseId = createCourse("theory-language-" + System.nanoTime());
+        Long moduleId = createModule(courseId, "Theory", 0);
+
+        String request = """
+                {
+                  "title": "Theory item",
+                  "itemType": "THEORY",
+                  "statement": "Read this text.",
+                  "orderIndex": 0
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/admin/modules/{moduleId}/items", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.language").value(nullValue()));
+    }
+
+    @Test
+    void shouldRejectQuizOptionsForCodingItem() throws Exception {
+        Long courseId = createCourse("coding-options-rejected-" + System.nanoTime());
+        Long moduleId = createModule(courseId, "Practice", 0);
+        Long itemId = createCodingItem(moduleId, "Print square", 0);
+
+        String request = """
+                {
+                  "options": [
+                    {
+                      "orderIndex": 0,
+                      "label": "A",
+                      "text": "n * n",
+                      "correct": true
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/course-items/{itemId}/options", itemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("cannot have quiz options")));
     }
 
     @Test
@@ -259,13 +436,17 @@ class AdminCourseControllerIntegrationTest {
     }
 
     private Long createModule(Long courseId) throws Exception {
+        return createModule(courseId, "Practice", 1);
+    }
+
+    private Long createModule(Long courseId, String title, int orderIndex) throws Exception {
         String request = """
                 {
-                  "title": "Practice",
+                  "title": "%s",
                   "description": "Practice module.",
-                  "orderIndex": 1
+                  "orderIndex": %d
                 }
-                """;
+                """.formatted(title, orderIndex);
 
         String response = mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -280,14 +461,18 @@ class AdminCourseControllerIntegrationTest {
     }
 
     private Long createCodingItem(Long moduleId) throws Exception {
+        return createCodingItem(moduleId, "Print square", 1);
+    }
+
+    private Long createCodingItem(Long moduleId, String title, int orderIndex) throws Exception {
         String request = """
                 {
-                  "title": "Print square",
+                  "title": "%s",
                   "itemType": "CODING",
                   "statement": "Read n and print n squared.",
                   "starterCode": "n = int(input())\\nprint(n * n)\\n",
                   "language": "python",
-                  "orderIndex": 1,
+                  "orderIndex": %d,
                   "timeLimitMs": 1500,
                   "memoryLimitMb": 256,
                   "outputLimitKb": 256,
@@ -297,7 +482,7 @@ class AdminCourseControllerIntegrationTest {
                   "normalizeLineEndings": true,
                   "trimTrailingWhitespaces": true
                 }
-                """;
+                """.formatted(title, orderIndex);
 
         String response = mockMvc.perform(post("/api/v1/admin/modules/{moduleId}/items", moduleId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -305,6 +490,29 @@ class AdminCourseControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.moduleId").value(moduleId))
                 .andExpect(jsonPath("$.itemType").value("CODING"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return extractLong(response, "id");
+    }
+
+    private Long createQuizItem(Long moduleId, String title, int orderIndex) throws Exception {
+        String request = """
+                {
+                  "title": "%s",
+                  "itemType": "QUIZ",
+                  "statement": "Choose the correct answer.",
+                  "orderIndex": %d
+                }
+                """.formatted(title, orderIndex);
+
+        String response = mockMvc.perform(post("/api/v1/admin/modules/{moduleId}/items", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.moduleId").value(moduleId))
+                .andExpect(jsonPath("$.itemType").value("QUIZ"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

@@ -18,6 +18,7 @@ public record UpdateCourseItemRequest(
         @Size(max = 50)
         String language,
 
+        @Min(0)
         Integer orderIndex,
 
         @Min(1)

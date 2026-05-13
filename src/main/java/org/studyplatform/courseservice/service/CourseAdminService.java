@@ -1,11 +1,17 @@
 package org.studyplatform.courseservice.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.studyplatform.courseservice.dto.admin.AdminCourseItemResponse;
+import org.studyplatform.courseservice.dto.admin.AdminCoursePageResponse;
 import org.studyplatform.courseservice.dto.admin.AdminCourseResponse;
+import org.studyplatform.courseservice.dto.admin.AdminCourseSummaryResponse;
 import org.studyplatform.courseservice.dto.admin.AdminModuleResponse;
 import org.studyplatform.courseservice.dto.admin.ContentBlockRequest;
 import org.studyplatform.courseservice.dto.admin.CreateCourseItemRequest;
@@ -13,6 +19,8 @@ import org.studyplatform.courseservice.dto.admin.CreateCourseRequest;
 import org.studyplatform.courseservice.dto.admin.CreateModuleRequest;
 import org.studyplatform.courseservice.dto.admin.HintRequest;
 import org.studyplatform.courseservice.dto.admin.QuizOptionRequest;
+import org.studyplatform.courseservice.dto.admin.ReorderItemsRequest;
+import org.studyplatform.courseservice.dto.admin.ReorderModulesRequest;
 import org.studyplatform.courseservice.dto.admin.ReplaceContentBlocksRequest;
 import org.studyplatform.courseservice.dto.admin.ReplaceHintsRequest;
 import org.studyplatform.courseservice.dto.admin.ReplaceQuizOptionsRequest;
@@ -44,14 +52,25 @@ import org.studyplatform.courseservice.repository.CourseItemRepository;
 import org.studyplatform.courseservice.repository.CourseItemTestCaseRepository;
 import org.studyplatform.courseservice.repository.CourseModuleRepository;
 import org.studyplatform.courseservice.repository.CourseRepository;
+import org.studyplatform.courseservice.security.CurrentUserService;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CourseAdminService {
+
+    private static final int MAX_ADMIN_PAGE_SIZE = 100;
 
     private final CourseRepository courseRepository;
     private final CourseModuleRepository moduleRepository;
@@ -61,6 +80,7 @@ public class CourseAdminService {
     private final CourseItemTestCaseRepository testCaseRepository;
     private final CourseItemOptionRepository optionRepository;
     private final AdminCourseMapper mapper;
+    private final CurrentUserService currentUserService;
 
     @Transactional
     @PreAuthorize("@courseAdminAuthorizationService.canCreateCourseFor(#request.createdByUserId())")
@@ -87,6 +107,63 @@ public class CourseAdminService {
 
         Course saved = courseRepository.save(course);
         return mapper.toCourseResponse(saved, List.of(), List.of());
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public AdminCoursePageResponse listCourses(
+            CourseStatus status,
+            CourseDifficulty difficulty,
+            CourseAccessType accessType,
+            Long createdByUserId,
+            int page,
+            int size
+    ) {
+        if (page < 0) {
+            throw new BadRequestException("page must be greater than or equal to 0");
+        }
+
+        if (size <= 0 || size > MAX_ADMIN_PAGE_SIZE) {
+            throw new BadRequestException("size must be between 1 and " + MAX_ADMIN_PAGE_SIZE);
+        }
+
+        Specification<Course> specification = (root, query, builder) -> builder.conjunction();
+
+        if (status != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("status"), status));
+        }
+
+        if (difficulty != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("difficulty"), difficulty));
+        }
+
+        if (accessType != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("accessType"), accessType));
+        }
+
+        Long effectiveCreatedByUserId = createdByUserId;
+        if (!currentUserService.isAdmin()) {
+            effectiveCreatedByUserId = currentUserService.getCurrentUserId()
+                    .orElseThrow(() -> new BadRequestException("Current teacher user id is missing"));
+        }
+
+        if (effectiveCreatedByUserId != null) {
+            Long ownerId = effectiveCreatedByUserId;
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("createdByUserId"), ownerId));
+        }
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Course> coursePage = courseRepository.findAll(specification, pageRequest);
+
+        return new AdminCoursePageResponse(
+                coursePage.getContent().stream()
+                        .map(this::toCourseSummaryResponse)
+                        .toList(),
+                coursePage.getNumber(),
+                coursePage.getSize(),
+                coursePage.getTotalElements(),
+                coursePage.getTotalPages()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +231,8 @@ public class CourseAdminService {
     @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminCourseResponse publishCourse(Long courseId) {
         Course course = getCourseOrThrow(courseId);
+        validateCourseForPublish(course);
+
         course.setStatus(CourseStatus.PUBLISHED);
 
         if (course.getPublishedAt() == null) {
@@ -177,6 +256,7 @@ public class CourseAdminService {
     @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminModuleResponse createModule(Long courseId, CreateModuleRequest request) {
         Course course = getCourseOrThrow(courseId);
+        assertOrderIndexAvailableForModule(courseId, request.orderIndex(), null);
 
         CourseModule module = CourseModule.builder()
                 .course(course)
@@ -187,6 +267,29 @@ public class CourseAdminService {
 
         CourseModule saved = moduleRepository.save(module);
         return mapper.toModuleResponse(saved, List.of());
+    }
+
+    @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
+    public AdminCourseResponse reorderModules(Long courseId, ReorderModulesRequest request) {
+        getCourseOrThrow(courseId);
+        List<CourseModule> modules = moduleRepository.findByCourseIdOrderByOrderIndexAsc(courseId);
+        validateReorderIds("orderedModuleIds", request.orderedModuleIds(), modules.stream().map(CourseModule::getId).toList());
+
+        Map<Long, CourseModule> modulesById = modules.stream()
+                .collect(Collectors.toMap(CourseModule::getId, Function.identity()));
+
+        for (int i = 0; i < modules.size(); i++) {
+            modules.get(i).setOrderIndex(-i - 1);
+        }
+        moduleRepository.saveAllAndFlush(modules);
+
+        for (int i = 0; i < request.orderedModuleIds().size(); i++) {
+            modulesById.get(request.orderedModuleIds().get(i)).setOrderIndex(i);
+        }
+        moduleRepository.saveAllAndFlush(modules);
+
+        return getCourse(courseId);
     }
 
     @Transactional
@@ -203,12 +306,37 @@ public class CourseAdminService {
         }
 
         if (request.orderIndex() != null) {
+            assertOrderIndexAvailableForModule(module.getCourse().getId(), request.orderIndex(), moduleId);
             module.setOrderIndex(request.orderIndex());
         }
 
         CourseModule saved = moduleRepository.save(module);
         List<CourseItem> items = itemRepository.findByModuleIdOrderByOrderIndexAsc(saved.getId());
         return mapper.toModuleResponse(saved, items);
+    }
+
+    @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageModule(#moduleId)")
+    public AdminModuleResponse reorderItems(Long moduleId, ReorderItemsRequest request) {
+        CourseModule module = getModuleOrThrow(moduleId);
+        List<CourseItem> items = itemRepository.findByModuleIdOrderByOrderIndexAsc(moduleId);
+        validateReorderIds("orderedItemIds", request.orderedItemIds(), items.stream().map(CourseItem::getId).toList());
+
+        Map<Long, CourseItem> itemsById = items.stream()
+                .collect(Collectors.toMap(CourseItem::getId, Function.identity()));
+
+        for (int i = 0; i < items.size(); i++) {
+            items.get(i).setOrderIndex(-i - 1);
+        }
+        itemRepository.saveAllAndFlush(items);
+
+        for (int i = 0; i < request.orderedItemIds().size(); i++) {
+            itemsById.get(request.orderedItemIds().get(i)).setOrderIndex(i);
+        }
+        itemRepository.saveAllAndFlush(items);
+
+        List<CourseItem> reorderedItems = itemRepository.findByModuleIdOrderByOrderIndexAsc(moduleId);
+        return mapper.toModuleResponse(module, reorderedItems);
     }
 
     @Transactional
@@ -229,11 +357,13 @@ public class CourseAdminService {
     @PreAuthorize("@courseAdminAuthorizationService.canManageModule(#moduleId)")
     public AdminCourseItemResponse createItem(Long moduleId, CreateCourseItemRequest request) {
         CourseModule module = getModuleOrThrow(moduleId);
+        CourseItemType itemType = valueOrDefault(request.itemType(), CourseItemType.CODING);
+        assertOrderIndexAvailableForItem(moduleId, request.orderIndex(), null);
 
         CourseItem item = CourseItem.builder()
                 .module(module)
                 .title(request.title().trim())
-                .itemType(valueOrDefault(request.itemType(), CourseItemType.CODING))
+                .itemType(itemType)
                 .statement(blankToNull(request.statement()))
                 .starterCode(blankToNull(request.starterCode()))
                 .language(blankToNull(request.language()))
@@ -247,6 +377,8 @@ public class CourseAdminService {
                 .normalizeLineEndings(request.normalizeLineEndings())
                 .trimTrailingWhitespaces(request.trimTrailingWhitespaces())
                 .build();
+
+        validateItemForSave(item, List.of(), List.of(), List.of());
 
         CourseItem saved = itemRepository.save(item);
         return mapper.toItemResponse(saved);
@@ -285,6 +417,7 @@ public class CourseAdminService {
         }
 
         if (request.orderIndex() != null) {
+            assertOrderIndexAvailableForItem(item.getModule().getId(), request.orderIndex(), itemId);
             item.setOrderIndex(request.orderIndex());
         }
 
@@ -320,6 +453,13 @@ public class CourseAdminService {
             item.setTrimTrailingWhitespaces(request.trimTrailingWhitespaces());
         }
 
+        validateItemForSave(
+                item,
+                contentBlockRepository.findByItemIdOrderByOrderIndexAsc(itemId),
+                testCaseRepository.findByItemIdOrderByOrderIndexAsc(itemId),
+                optionRepository.findByItemIdOrderByOrderIndexAsc(itemId)
+        );
+
         CourseItem saved = itemRepository.save(item);
         return mapFullItem(saved);
     }
@@ -336,6 +476,7 @@ public class CourseAdminService {
     @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceContentBlocks(Long itemId, ReplaceContentBlocksRequest request) {
         CourseItem item = getItemOrThrow(itemId);
+        validateUniqueOrderIndexes("contentBlocks", request.contentBlocks().stream().map(ContentBlockRequest::orderIndex).toList());
 
         List<CourseItemContentBlock> existing = contentBlockRepository.findByItemIdOrderByOrderIndexAsc(itemId);
         contentBlockRepository.deleteAllInBatch(existing);
@@ -353,6 +494,7 @@ public class CourseAdminService {
     @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceHints(Long itemId, ReplaceHintsRequest request) {
         CourseItem item = getItemOrThrow(itemId);
+        validateUniqueOrderIndexes("hints", request.hints().stream().map(HintRequest::orderIndex).toList());
 
         List<CourseItemHint> existing = hintRepository.findByItemIdOrderByOrderIndexAsc(itemId);
         hintRepository.deleteAllInBatch(existing);
@@ -370,6 +512,9 @@ public class CourseAdminService {
     @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceTestCases(Long itemId, ReplaceTestCasesRequest request) {
         CourseItem item = getItemOrThrow(itemId);
+        validateTestCasesAllowed(item);
+        validateUniqueOrderIndexes("testCases", request.testCases().stream().map(TestCaseRequest::orderIndex).toList());
+        validateUniqueValues("testCases.testKey", request.testCases().stream().map(TestCaseRequest::testKey).toList());
 
         List<CourseItemTestCase> existing = testCaseRepository.findByItemIdOrderByOrderIndexAsc(itemId);
         testCaseRepository.deleteAllInBatch(existing);
@@ -387,6 +532,8 @@ public class CourseAdminService {
     @PreAuthorize("@courseAdminAuthorizationService.canManageItem(#itemId)")
     public AdminCourseItemResponse replaceOptions(Long itemId, ReplaceQuizOptionsRequest request) {
         CourseItem item = getItemOrThrow(itemId);
+        validateOptionsAllowed(item);
+        validateUniqueOrderIndexes("options", request.options().stream().map(QuizOptionRequest::orderIndex).toList());
 
         List<CourseItemOption> existing = optionRepository.findByItemIdOrderByOrderIndexAsc(itemId);
         optionRepository.deleteAllInBatch(existing);
@@ -398,6 +545,25 @@ public class CourseAdminService {
 
         optionRepository.saveAll(options);
         return mapFullItem(item);
+    }
+
+    private AdminCourseSummaryResponse toCourseSummaryResponse(Course course) {
+        return new AdminCourseSummaryResponse(
+                course.getId(),
+                course.getSlug(),
+                course.getTitle(),
+                course.getShortDescription(),
+                course.getDifficulty(),
+                course.getStatus(),
+                course.getAccessType(),
+                course.getEnrollmentEnabled(),
+                course.getCoverImageUrl(),
+                course.getEstimatedMinutes(),
+                course.getCreatedByUserId(),
+                course.getCreatedAt(),
+                course.getUpdatedAt(),
+                course.getPublishedAt()
+        );
     }
 
     private AdminCourseItemResponse mapFullItem(CourseItem item) {
@@ -473,6 +639,314 @@ public class CourseAdminService {
                 .correct(request.correct())
                 .explanation(blankToNull(request.explanation()))
                 .build();
+    }
+
+    private void validateCourseForPublish(Course course) {
+        List<String> errors = new ArrayList<>();
+
+        if (!hasText(course.getTitle())) {
+            errors.add("Course title must not be blank");
+        }
+
+        if (!hasText(course.getSlug())) {
+            errors.add("Course slug must not be blank");
+        }
+
+        List<CourseModule> modules = moduleRepository.findByCourseIdOrderByOrderIndexAsc(course.getId());
+        if (modules.isEmpty()) {
+            errors.add("Course must contain at least one module");
+        }
+
+        errors.addAll(validateExistingOrderIndexes("modules", modules.stream().map(CourseModule::getOrderIndex).toList()));
+
+        for (CourseModule module : modules) {
+            if (!hasText(module.getTitle())) {
+                errors.add("Module id=" + module.getId() + " must have a title");
+            }
+
+            List<CourseItem> items = itemRepository.findByModuleIdOrderByOrderIndexAsc(module.getId());
+            if (items.isEmpty()) {
+                errors.add("Module '" + displayName(module.getTitle(), module.getId()) + "' must contain at least one course item");
+            }
+
+            errors.addAll(validateExistingOrderIndexes(
+                    "items in module '" + displayName(module.getTitle(), module.getId()) + "'",
+                    items.stream().map(CourseItem::getOrderIndex).toList()
+            ));
+
+            for (CourseItem item : items) {
+                List<CourseItemContentBlock> blocks = contentBlockRepository.findByItemIdOrderByOrderIndexAsc(item.getId());
+                List<CourseItemTestCase> testCases = testCaseRepository.findByItemIdOrderByOrderIndexAsc(item.getId());
+                List<CourseItemOption> options = optionRepository.findByItemIdOrderByOrderIndexAsc(item.getId());
+
+                errors.addAll(validateExistingOrderIndexes(
+                        "content blocks in item '" + displayName(item.getTitle(), item.getId()) + "'",
+                        blocks.stream().map(CourseItemContentBlock::getOrderIndex).toList()
+                ));
+                errors.addAll(validateExistingOrderIndexes(
+                        "test cases in item '" + displayName(item.getTitle(), item.getId()) + "'",
+                        testCases.stream().map(CourseItemTestCase::getOrderIndex).toList()
+                ));
+                errors.addAll(validateExistingOrderIndexes(
+                        "quiz options in item '" + displayName(item.getTitle(), item.getId()) + "'",
+                        options.stream().map(CourseItemOption::getOrderIndex).toList()
+                ));
+                errors.addAll(validateExistingUniqueValues(
+                        "test case keys in item '" + displayName(item.getTitle(), item.getId()) + "'",
+                        testCases.stream().map(CourseItemTestCase::getTestKey).toList()
+                ));
+
+                errors.addAll(validateItemForPublish(item, blocks, testCases, options));
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new BadRequestException("Course cannot be published: " + String.join("; ", errors));
+        }
+    }
+
+    private void validateItemForSave(
+            CourseItem item,
+            List<CourseItemContentBlock> contentBlocks,
+            List<CourseItemTestCase> testCases,
+            List<CourseItemOption> options
+    ) {
+        List<String> errors = validateItemBaseStructure(item, contentBlocks, testCases, options, false);
+        if (!errors.isEmpty()) {
+            throw new BadRequestException(String.join("; ", errors));
+        }
+    }
+
+    private List<String> validateItemForPublish(
+            CourseItem item,
+            List<CourseItemContentBlock> contentBlocks,
+            List<CourseItemTestCase> testCases,
+            List<CourseItemOption> options
+    ) {
+        return validateItemBaseStructure(item, contentBlocks, testCases, options, true);
+    }
+
+    private List<String> validateItemBaseStructure(
+            CourseItem item,
+            List<CourseItemContentBlock> contentBlocks,
+            List<CourseItemTestCase> testCases,
+            List<CourseItemOption> options,
+            boolean publishValidation
+    ) {
+        List<String> errors = new ArrayList<>();
+        String itemName = displayName(item.getTitle(), item.getId());
+        CourseItemType itemType = item.getItemType();
+
+        if (itemType == null) {
+            errors.add("Course item '" + itemName + "' must have itemType");
+            return errors;
+        }
+
+        if (!hasText(item.getTitle())) {
+            errors.add("Course item id=" + item.getId() + " must have a title");
+        }
+
+        if (item.getOrderIndex() == null || item.getOrderIndex() < 0) {
+            errors.add("Course item '" + itemName + "' must have non-negative orderIndex");
+        }
+
+        if (isExecutable(itemType)) {
+            if (!hasText(item.getLanguage())) {
+                errors.add(itemType + " item '" + itemName + "' must have non-blank language");
+            }
+
+            if (publishValidation) {
+                if (!isPositive(item.getTimeLimitMs())) {
+                    errors.add(itemType + " item '" + itemName + "' must have positive timeLimitMs");
+                }
+                if (!isPositive(item.getMemoryLimitMb())) {
+                    errors.add(itemType + " item '" + itemName + "' must have positive memoryLimitMb");
+                }
+                if (!isPositive(item.getOutputLimitKb())) {
+                    errors.add(itemType + " item '" + itemName + "' must have positive outputLimitKb");
+                }
+            }
+
+            if (!options.isEmpty()) {
+                errors.add(itemType + " item '" + itemName + "' must not have quiz options");
+            }
+        }
+
+        if (itemType == CourseItemType.QUIZ) {
+            if (!testCases.isEmpty()) {
+                errors.add("QUIZ item '" + itemName + "' must not have test cases");
+            }
+
+            if (publishValidation) {
+                if (options.isEmpty()) {
+                    errors.add("QUIZ item '" + itemName + "' must contain at least one option");
+                }
+
+                boolean hasCorrectOption = options.stream().anyMatch(option -> Boolean.TRUE.equals(option.getCorrect()));
+                if (!hasCorrectOption) {
+                    errors.add("QUIZ item '" + itemName + "' must contain at least one correct option");
+                }
+            }
+        }
+
+        if (itemType == CourseItemType.THEORY || itemType == CourseItemType.FILE) {
+            if (!testCases.isEmpty()) {
+                errors.add(itemType + " item '" + itemName + "' must not have test cases");
+            }
+
+            if (!options.isEmpty()) {
+                errors.add(itemType + " item '" + itemName + "' must not have quiz options");
+            }
+
+            if (publishValidation && !hasVisibleContent(item, contentBlocks)) {
+                errors.add(itemType + " item '" + itemName + "' must have statement or content blocks before publishing");
+            }
+        }
+
+        return errors;
+    }
+
+    private void validateTestCasesAllowed(CourseItem item) {
+        if (!isExecutable(item.getItemType())) {
+            throw new BadRequestException(item.getItemType() + " item cannot have test cases");
+        }
+    }
+
+    private void validateOptionsAllowed(CourseItem item) {
+        if (item.getItemType() != CourseItemType.QUIZ) {
+            throw new BadRequestException(item.getItemType() + " item cannot have quiz options");
+        }
+    }
+
+    private void assertOrderIndexAvailableForModule(Long courseId, Integer orderIndex, Long currentModuleId) {
+        List<CourseModule> modules = moduleRepository.findByCourseIdOrderByOrderIndexAsc(courseId);
+        boolean duplicate = modules.stream()
+                .filter(module -> !Objects.equals(module.getId(), currentModuleId))
+                .anyMatch(module -> Objects.equals(module.getOrderIndex(), orderIndex));
+
+        if (duplicate) {
+            throw new BadRequestException("Duplicate module orderIndex inside course: " + orderIndex);
+        }
+    }
+
+    private void assertOrderIndexAvailableForItem(Long moduleId, Integer orderIndex, Long currentItemId) {
+        List<CourseItem> items = itemRepository.findByModuleIdOrderByOrderIndexAsc(moduleId);
+        boolean duplicate = items.stream()
+                .filter(item -> !Objects.equals(item.getId(), currentItemId))
+                .anyMatch(item -> Objects.equals(item.getOrderIndex(), orderIndex));
+
+        if (duplicate) {
+            throw new BadRequestException("Duplicate course item orderIndex inside module: " + orderIndex);
+        }
+    }
+
+    private void validateReorderIds(String fieldName, List<Long> requestedIds, List<Long> existingIds) {
+        if (requestedIds == null || requestedIds.isEmpty()) {
+            throw new BadRequestException(fieldName + " must not be empty");
+        }
+
+        if (requestedIds.stream().anyMatch(Objects::isNull)) {
+            throw new BadRequestException(fieldName + " must not contain null values");
+        }
+
+        Set<Long> requestedUniqueIds = new LinkedHashSet<>(requestedIds);
+        if (requestedUniqueIds.size() != requestedIds.size()) {
+            throw new BadRequestException(fieldName + " must not contain duplicate IDs");
+        }
+
+        Set<Long> existingIdSet = new LinkedHashSet<>(existingIds);
+        Set<Long> missingIds = new LinkedHashSet<>(existingIdSet);
+        missingIds.removeAll(requestedUniqueIds);
+
+        Set<Long> foreignIds = new LinkedHashSet<>(requestedUniqueIds);
+        foreignIds.removeAll(existingIdSet);
+
+        if (!missingIds.isEmpty()) {
+            throw new BadRequestException(fieldName + " is missing existing IDs: " + missingIds);
+        }
+
+        if (!foreignIds.isEmpty()) {
+            throw new BadRequestException(fieldName + " contains foreign IDs: " + foreignIds);
+        }
+    }
+
+    private void validateUniqueOrderIndexes(String fieldName, List<Integer> orderIndexes) {
+        List<String> errors = validateExistingOrderIndexes(fieldName, orderIndexes);
+        if (!errors.isEmpty()) {
+            throw new BadRequestException(String.join("; ", errors));
+        }
+    }
+
+    private List<String> validateExistingOrderIndexes(String fieldName, List<Integer> orderIndexes) {
+        List<String> errors = new ArrayList<>();
+        Set<Integer> seen = new HashSet<>();
+        Set<Integer> duplicates = new LinkedHashSet<>();
+
+        for (Integer orderIndex : orderIndexes) {
+            if (orderIndex == null) {
+                errors.add(fieldName + " must not contain null orderIndex");
+                continue;
+            }
+
+            if (orderIndex < 0) {
+                errors.add(fieldName + " must not contain negative orderIndex: " + orderIndex);
+            }
+
+            if (!seen.add(orderIndex)) {
+                duplicates.add(orderIndex);
+            }
+        }
+
+        if (!duplicates.isEmpty()) {
+            errors.add(fieldName + " contains duplicate orderIndex values: " + duplicates);
+        }
+
+        return errors;
+    }
+
+    private void validateUniqueValues(String fieldName, List<String> values) {
+        List<String> errors = validateExistingUniqueValues(fieldName, values);
+        if (!errors.isEmpty()) {
+            throw new BadRequestException(String.join("; ", errors));
+        }
+    }
+
+    private List<String> validateExistingUniqueValues(String fieldName, List<String> values) {
+        Set<String> seen = new HashSet<>();
+        Set<String> duplicates = new LinkedHashSet<>();
+
+        for (String value : values) {
+            if (value == null) {
+                continue;
+            }
+
+            String normalized = value.trim().toLowerCase(Locale.ROOT);
+            if (!seen.add(normalized)) {
+                duplicates.add(value);
+            }
+        }
+
+        if (duplicates.isEmpty()) {
+            return List.of();
+        }
+
+        return List.of(fieldName + " contains duplicate values: " + duplicates);
+    }
+
+    private boolean isExecutable(CourseItemType itemType) {
+        return itemType == CourseItemType.CODING || itemType == CourseItemType.SQL;
+    }
+
+    private boolean hasVisibleContent(CourseItem item, List<CourseItemContentBlock> contentBlocks) {
+        return hasText(item.getStatement()) || !contentBlocks.isEmpty();
+    }
+
+    private boolean isPositive(Integer value) {
+        return value != null && value > 0;
+    }
+
+    private String displayName(String title, Long id) {
+        return hasText(title) ? title.trim() : "id=" + id;
     }
 
     private String normalizeSlug(String slug) {

@@ -43,3 +43,32 @@ Public endpoints must not expose:
 Internal content may expose student-safe full content, but not hidden tests or expected outputs.
 
 Execution package may expose hidden tests and expected outputs only to LearningService.
+
+
+## Admin editor additions
+
+```http
+GET /api/v1/admin/courses?page=0&size=20&status=DRAFT&difficulty=BEGINNER&accessType=PUBLIC&createdByUserId=123
+PUT /api/v1/admin/courses/{courseId}/modules/reorder
+PUT /api/v1/admin/modules/{moduleId}/items/reorder
+```
+
+Module reorder body:
+
+```json
+{
+  "orderedModuleIds": [3, 1, 2]
+}
+```
+
+Item reorder body:
+
+```json
+{
+  "orderedItemIds": [8, 5, 6, 7]
+}
+```
+
+Reorder requests must include every current child ID exactly once. Duplicate, missing and foreign IDs return `400 Bad Request`.
+
+CourseService keeps `language` as a string and does not own the execution language allowlist. It only checks that `CODING` and `SQL` items have non-blank `language`; LearningService, CodeExecutorService and frontend decide which language values are executable.
