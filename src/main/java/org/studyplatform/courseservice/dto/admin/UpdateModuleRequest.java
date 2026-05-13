@@ -1,5 +1,6 @@
 package org.studyplatform.courseservice.dto.admin;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
 public record UpdateModuleRequest(
@@ -8,6 +9,7 @@ public record UpdateModuleRequest(
 
         String description,
 
+        @Min(0)
         Integer orderIndex
 ) {
 }

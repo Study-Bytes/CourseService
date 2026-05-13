@@ -100,6 +100,7 @@ The current development configuration expects roles in the `roles` claim, for ex
 ### Course management
 
 ```http
+GET  /api/v1/admin/courses?page=0&size=20&status=DRAFT&difficulty=BEGINNER&accessType=PUBLIC&createdByUserId=123
 POST /api/v1/admin/courses
 GET  /api/v1/admin/courses/{courseId}
 PUT  /api/v1/admin/courses/{courseId}
@@ -107,22 +108,46 @@ POST /api/v1/admin/courses/{courseId}/publish
 POST /api/v1/admin/courses/{courseId}/archive
 ```
 
+`GET /api/v1/admin/courses` returns a paginated admin course list. `ADMIN` can list all courses. `TEACHER` can list only courses where `createdByUserId` equals the authenticated user id. Default sorting is `createdAt DESC`.
+
 ### Module management
 
 ```http
 POST   /api/v1/admin/courses/{courseId}/modules
+PUT    /api/v1/admin/courses/{courseId}/modules/reorder
 PUT    /api/v1/admin/modules/{moduleId}
 DELETE /api/v1/admin/modules/{moduleId}
 ```
+
+Module reorder request:
+
+```json
+{
+  "orderedModuleIds": [3, 1, 2]
+}
+```
+
+The request must contain all existing module IDs from the course exactly once. Missing, duplicate and foreign IDs are rejected with `400 Bad Request`.
 
 ### Course item management
 
 ```http
 POST   /api/v1/admin/modules/{moduleId}/items
+PUT    /api/v1/admin/modules/{moduleId}/items/reorder
 GET    /api/v1/admin/course-items/{itemId}
 PUT    /api/v1/admin/course-items/{itemId}
 DELETE /api/v1/admin/course-items/{itemId}
 ```
+
+Course item reorder request:
+
+```json
+{
+  "orderedItemIds": [8, 5, 6, 7]
+}
+```
+
+The request must contain all existing item IDs from the module exactly once. Missing, duplicate and foreign IDs are rejected with `400 Bad Request`.
 
 ### Child content replacement
 
@@ -136,6 +161,22 @@ PUT /api/v1/admin/course-items/{itemId}/options
 These endpoints replace the whole child collection for a course item. This is simpler for an MVP course editor: the frontend/BFF sends the current list as the source of truth.
 
 
+
+## Course editor validation rules
+
+CourseService validates course structure and content consistency. It does not decide which programming languages can actually be executed. The `language` field remains a string because LearningService, CodeExecutorService and frontend creation UI own execution-language support.
+
+Validation rules:
+
+- `orderIndex` must be non-negative for modules, items, content blocks, hints, test cases and quiz options.
+- Duplicate `orderIndex` values inside the same parent collection are rejected before database unique constraints are hit.
+- `CODING` and `SQL` items must have a non-blank `language`. CourseService does not restrict the value to a hardcoded language allowlist.
+- `CODING` and `SQL` items may have test cases and must not have quiz options.
+- `QUIZ` items may have quiz options and must not have test cases. Before publishing, a quiz must contain at least one option and at least one correct option.
+- `THEORY` and `FILE` items must not have test cases or quiz options. Before publishing, they must contain either `statement` or content blocks.
+- `THEORY`, `QUIZ` and `FILE` items do not automatically receive `language = "python"`.
+
+Publishing runs full structure validation before changing course status to `PUBLISHED`. Invalid courses remain unchanged and return `400 Bad Request` with a clear message.
 
 ## Internal API
 

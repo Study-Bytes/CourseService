@@ -119,9 +119,6 @@ public class CourseItem {
             itemType = CourseItemType.CODING;
         }
 
-        if (language == null || language.isBlank()) {
-            language = "python";
-        }
 
         if (timeLimitMs == null) {
             timeLimitMs = 1500;
