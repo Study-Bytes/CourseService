@@ -2,6 +2,8 @@
 
 CourseService is not a public production entry point. Site should call BFF, and BFF should call CourseService and LearningService from the backend network.
 
+For a compact endpoint ownership table, see [Endpoints Quick Reference](ENDPOINTS_QUICK_REFERENCE.md).
+
 ## Base URL
 
 Inside Docker:
@@ -97,4 +99,3 @@ GET /api/v1/internal/course-items/{itemId}/execution-package
 ```
 
 This endpoint can include hidden tests and expected output. It is for LearningService execution/evaluation flows only.
-

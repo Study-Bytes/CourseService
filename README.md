@@ -294,11 +294,21 @@ CourseService deployment runs the application container with a dedicated Postgre
 COURSE_SERVICE_DB_URL=jdbc:postgresql://course-postgres:5432/course_service
 ```
 
-This compose file expects external networks. Create them once before startup:
+This compose file uses two Docker networks:
+
+- `COURSE_BACKEND_NETWORK` is the shared external backend network for BFF, UserService, CourseService and LearningService.
+- `COURSE_DB_NETWORK` is the private CourseService database network. Do not create it manually; Docker Compose creates it as an internal network for `course-service` and `course-postgres`.
+
+Create only the shared backend network once before startup:
 
 ```powershell
 docker network create studybytes_backend_net
-docker network create --internal course_db_net
+```
+
+If `course_db_net` was created manually before, remove it once before the next startup so Compose can recreate it with the right internal settings:
+
+```powershell
+docker network rm course_db_net
 ```
 
 Local compose startup:
@@ -307,6 +317,28 @@ Local compose startup:
 Copy-Item .env.example .env
 docker compose up --build
 ```
+
+Until BFF/reverse proxy is ready, `docker-compose.yml` publishes CourseService only on the VPS loopback interface for Nginx:
+
+```text
+127.0.0.1:8082 -> course-service:8082
+```
+
+This means Nginx on the VPS can proxy to `http://127.0.0.1:8082`, but `http://<vps-ip>:8082` should not be reachable from outside. Public team access should go through Nginx, for example:
+
+```text
+https://dev-api.studybytes.ru/course-service/swagger-ui.html
+```
+
+This is temporary. In the full platform deployment, public traffic should enter through BFF/reverse proxy and this CourseService-specific exposure should be removed or kept localhost-only.
+
+The production profile enables forwarded header support so Spring and Springdoc can build correct URLs behind Nginx path prefixes:
+
+```properties
+server.forward-headers-strategy=framework
+```
+
+Nginx should pass `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix` when serving CourseService under `/course-service`.
 
 Health checks:
 
@@ -320,10 +352,12 @@ The repository keeps only `.env.example`. Real `.env` files, private keys and se
 
 Detailed deployment and integration guides:
 
+- [Endpoints quick reference](docs/integration/ENDPOINTS_QUICK_REFERENCE.md)
 - [BFF integration](docs/integration/BFF_USAGE.md)
 - [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
 - [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
 - [VPS deployment](docs/deployment/VPS_DEPLOYMENT.md)
+- [CI/CD pipeline](docs/deployment/CI_CD.md)
 
 ## Run
 
@@ -350,6 +384,8 @@ Run OpenAPI generation:
 ```powershell
 .\mvnw.cmd verify -Popenapi
 ```
+
+The Maven `openapi` profile starts the app with Spring profiles `dev,openapi`. The `openapi` Spring profile disables external JWT/JWKS lookup during contract generation, so this command does not require UserService to be running.
 
 ## Manual API checks
 
@@ -382,6 +418,7 @@ Site should normally call BFF, not CourseService directly. CourseService public 
 
 Detailed integration guides:
 
+- [Endpoints quick reference](docs/integration/ENDPOINTS_QUICK_REFERENCE.md)
 - [BFF integration](docs/integration/BFF_USAGE.md)
 - [LearningService integration](docs/integration/LEARNING_SERVICE_USAGE.md)
 - [Networks and secrets](docs/integration/NETWORK_AND_SECRETS.md)
@@ -389,7 +426,6 @@ Detailed integration guides:
 ## Next planned tasks
 
 - Add Flyway migrations and switch production `ddl-auto` to `validate`.
-- Add CI/CD pipeline.
 - Add contract tests for BFF and LearningService integration.
 
 

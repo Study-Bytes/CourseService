@@ -2,6 +2,8 @@
 
 CourseService deployment uses separate networks for backend traffic and database traffic.
 
+For endpoint ownership and caller rules, see [Endpoints Quick Reference](ENDPOINTS_QUICK_REFERENCE.md).
+
 ## Networks
 
 Recommended platform networks:
@@ -25,19 +27,20 @@ course_db_net:
   course-postgres
 ```
 
-In this repository, `docker-compose.yml` expects external networks:
+In this repository, `docker-compose.yml` uses these network names:
 
 ```text
 studybytes_backend_net
 course_db_net
 ```
 
-Create them before running compose:
+Only `studybytes_backend_net` is external. Create it once before running compose:
 
 ```powershell
 docker network create studybytes_backend_net
-docker network create --internal course_db_net
 ```
+
+`course_db_net` is not shared across services. It is created by `docker compose` as an internal private network for `course-service` and `course-postgres`.
 
 The names can be overridden in `.env`:
 
@@ -46,20 +49,42 @@ COURSE_BACKEND_NETWORK=studybytes_backend_net
 COURSE_DB_NETWORK=course_db_net
 ```
 
+If `course_db_net` was created manually before, remove it once so Compose can recreate it with the correct internal settings:
+
+```powershell
+docker network rm course_db_net
+```
+
 ## Exposure Rules
 
 Production rules:
 
 - PostgreSQL must not be exposed publicly.
-- CourseService should not be the public entry point.
+- CourseService host exposure is temporary and must be bound to `127.0.0.1` for VPS Nginx.
 - Public traffic should enter through reverse proxy, Site and BFF.
 - Internal CourseService endpoints should be reachable only from backend services.
 
-For local development, `docker-compose.yml` maps CourseService to the host:
+For local development and temporary VPS Nginx proxying, `docker-compose.yml` maps CourseService to the host loopback interface:
 
 ```text
-localhost:8082 -> course-service:8082
+127.0.0.1:8082 -> course-service:8082
 ```
+
+Temporary public Swagger URL through Nginx:
+
+```text
+https://dev-api.studybytes.ru/course-service/swagger-ui.html
+```
+
+Direct external access to `http://<vps-ip>:8082` should not work. Remove this CourseService-specific mapping or keep it localhost-only when BFF/reverse proxy becomes the platform entry point.
+
+The production Spring profile uses:
+
+```properties
+server.forward-headers-strategy=framework
+```
+
+Nginx should forward `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Prefix` so Swagger and OpenAPI links match the public URL.
 
 ## Environment Files
 
@@ -122,4 +147,3 @@ The same value must be configured in CourseService and trusted callers:
 ```properties
 COURSE_SERVICE_INTERNAL_API_KEY=change-me-internal-api-key
 ```
-
