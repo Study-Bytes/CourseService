@@ -11,6 +11,7 @@ It owns courses, modules, course items, rich content blocks, hints, test cases a
 - Maven
 - PostgreSQL
 - Spring Data JPA
+- Flyway
 - Spring Security
 - springdoc-openapi
 
@@ -252,6 +253,80 @@ Then commit the updated file:
 git add docs/openapi/course-service-openapi.yaml
 ```
 
+
+## Database migrations
+
+Flyway owns the CourseService database schema. Hibernate must validate the mapped schema; it must not create or mutate production tables silently.
+
+Runtime defaults:
+
+```properties
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+spring.flyway.default-schema=public
+spring.jpa.hibernate.ddl-auto=validate
+```
+
+The initial schema is stored in:
+
+```text
+src/main/resources/db/migration/V1__init_course_service_schema.sql
+```
+
+On application startup Flyway creates the `flyway_schema_history` table and applies every pending migration before Hibernate validates JPA mappings.
+
+### Local database reset
+
+For local development with Docker Compose, reset the CourseService database volume only when losing local data is acceptable:
+
+```powershell
+docker compose down -v
+docker compose up --build
+```
+
+For the standalone PostgreSQL container shown below:
+
+```powershell
+docker rm -f course-service-postgres
+
+docker run --name course-service-postgres `
+  -e POSTGRES_DB=course_service `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -p 5432:5432 `
+  -d postgres:16
+```
+
+After reset, CourseService should start against the empty database and Flyway should recreate all schema objects from migrations.
+
+### Adding future migrations
+
+Migration files must be immutable after they are committed and applied to any shared environment. Do not edit an existing `V*__*.sql` file to change an already-applied schema. Add a new migration instead.
+
+Naming rules:
+
+```text
+src/main/resources/db/migration/V<next_number>__short_description.sql
+```
+
+Examples:
+
+```text
+V2__add_course_tags.sql
+V3__add_item_publish_settings.sql
+V4__create_course_assets_table.sql
+```
+
+Use lowercase snake_case table and column names to match the existing JPA mappings. After adding a migration, run:
+
+```powershell
+.\mvnw.cmd clean test
+docker compose down -v
+docker compose up --build
+```
+
+Then verify startup logs contain successful Flyway migration output and that `/health`, public API, admin API and internal API still work.
+
 ## Local PostgreSQL
 
 Start PostgreSQL:
@@ -284,7 +359,7 @@ docker run --name course-service-postgres `
   -d postgres:16
 ```
 
-Reset is useful after entity field renames because `spring.jpa.hibernate.ddl-auto=update` may keep old columns.
+Reset is useful when testing migrations from a completely empty database. After reset, Flyway should recreate the schema and Hibernate should validate it.
 
 ## Deployment
 
@@ -425,7 +500,6 @@ Detailed integration guides:
 
 ## Next planned tasks
 
-- Add Flyway migrations and switch production `ddl-auto` to `validate`.
 - Add contract tests for BFF and LearningService integration.
 
 
