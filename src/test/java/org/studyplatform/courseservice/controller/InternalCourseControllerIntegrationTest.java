@@ -87,6 +87,16 @@ class InternalCourseControllerIntegrationTest {
     }
 
     @Test
+    void shouldRejectInternalEndpointWithInvalidApiKey() throws Exception {
+        Long itemId = seedCodingItem().itemId();
+
+        mockMvc.perform(get("/api/v1/internal/course-items/{itemId}/execution-package", itemId)
+                        .header("X-Internal-Api-Key", "wrong-key"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid or missing internal API key"));
+    }
+
+    @Test
     void shouldReturnExecutionPackageWithHiddenTestsForValidInternalApiKey() throws Exception {
         Long itemId = seedCodingItem().itemId();
 

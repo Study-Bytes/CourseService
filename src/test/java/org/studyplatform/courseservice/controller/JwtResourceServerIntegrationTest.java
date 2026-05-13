@@ -106,6 +106,39 @@ class JwtResourceServerIntegrationTest {
     }
 
     @Test
+    void shouldRejectJwtWithInvalidAudience() throws Exception {
+        String token = createJwt("1", ISSUER, "wrong-audience", List.of("TEACHER"));
+
+        mockMvc.perform(post("/api/v1/admin/courses")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createCourseRequest("jwks-invalid-audience", 1L)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectJwtWithInvalidIssuer() throws Exception {
+        String token = createJwt("1", "http://wrong-issuer", AUDIENCE, List.of("TEACHER"));
+
+        mockMvc.perform(post("/api/v1/admin/courses")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createCourseRequest("jwks-invalid-issuer", 1L)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectJwtWithoutTeacherOrAdminRole() throws Exception {
+        String token = createJwt("1", List.of("STUDENT"));
+
+        mockMvc.perform(post("/api/v1/admin/courses")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createCourseRequest("jwks-student", 1L)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void shouldApplyOwnershipChecksForJwksVerifiedJwt() throws Exception {
         String token = createJwt("2", List.of("TEACHER"));
 
@@ -127,11 +160,15 @@ class JwtResourceServerIntegrationTest {
     }
 
     private static String createJwt(String subject, List<String> roles) throws JOSEException {
+        return createJwt(subject, ISSUER, AUDIENCE, roles);
+    }
+
+    private static String createJwt(String subject, String issuer, String audience, List<String> roles) throws JOSEException {
         Instant now = Instant.now();
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
-                .issuer(ISSUER)
+                .issuer(issuer)
                 .subject(subject)
-                .audience(AUDIENCE)
+                .audience(audience)
                 .claim("roles", roles)
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(now.plusSeconds(3600)))
