@@ -92,10 +92,12 @@ SPRING_PROFILES_ACTIVE=prod
 
 The application container still listens on `8082`. Docker binds the host port to `127.0.0.1`, so Nginx on the VPS can proxy to `http://127.0.0.1:8082`, but direct external access to `http://<vps-ip>:8082` should not work.
 
-Temporary public access should go through Nginx:
+Public development access goes through Nginx:
 
 ```text
 https://dev-api.studybytes.ru/course-service/swagger-ui.html
+https://dev-api.studybytes.ru/course-service/v3/api-docs
+https://dev-api.studybytes.ru/course-service/api/v1/courses
 ```
 
 In the full platform deployment, public traffic should enter through BFF/reverse proxy and this CourseService-specific exposure should be removed or kept localhost-only.
@@ -118,6 +120,18 @@ proxy_set_header X-Forwarded-Prefix /course-service;
 
 These headers let Spring and Springdoc build Swagger/OpenAPI URLs with the correct public scheme, host and path prefix.
 
+Nginx strips the external `/course-service` prefix before proxying to the container. External requests like:
+
+```text
+https://dev-api.studybytes.ru/course-service/api/v1/courses
+```
+
+reach the application as:
+
+```text
+http://127.0.0.1:8082/api/v1/courses
+```
+
 Do not put UserService private keys into CourseService.
 
 ## 5. Start Service
@@ -139,6 +153,8 @@ If the host port is exposed:
 ```bash
 curl http://localhost:8082/health
 curl http://localhost:8082/ready
+curl https://dev-api.studybytes.ru/course-service/health
+curl https://dev-api.studybytes.ru/course-service/ready
 ```
 
 Expected:

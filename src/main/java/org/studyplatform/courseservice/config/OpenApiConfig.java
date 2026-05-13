@@ -4,8 +4,11 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Configuration
 public class OpenApiConfig {
@@ -16,6 +19,17 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI courseServiceOpenAPI() {
         return new OpenAPI()
+                .servers(List.of(
+                        new Server()
+                                .url("https://dev-api.studybytes.ru/course-service")
+                                .description("Development gateway through Nginx"),
+                        new Server()
+                                .url("http://localhost:8082")
+                                .description("Local direct access"),
+                        new Server()
+                                .url("http://course-service:8082")
+                                .description("Docker backend network")
+                ))
                 .info(new Info()
                         .title("CourseService API")
                         .version("v1")

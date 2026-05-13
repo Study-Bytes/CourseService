@@ -25,9 +25,9 @@ It runs:
 
 ```bash
 ./mvnw -B clean test
-./mvnw -B verify -Popenapi
+./mvnw -B -DskipTests verify -Popenapi
 git diff --exit-code docs/openapi/course-service-openapi.yaml
-docker build -t studybytes/course-service:ci .
+docker buildx build --load -t studybytes/course-service:ci .
 ```
 
 The OpenAPI check is intentional. If controllers or DTOs change and the committed local OpenAPI file is stale, CI must fail.
@@ -66,7 +66,15 @@ GitHub Actions
   -> git checkout main
   -> git pull --ff-only origin main
   -> docker compose up -d --build
-  -> curl http://localhost:8082/health
+  -> curl http://127.0.0.1:8082/health
+```
+
+The public development gateway for manual post-deploy checks is:
+
+```text
+https://dev-api.studybytes.ru/course-service/swagger-ui.html
+https://dev-api.studybytes.ru/course-service/health
+https://dev-api.studybytes.ru/course-service/api/v1/courses
 ```
 
 ## Required GitHub Secrets
@@ -189,7 +197,8 @@ On VPS:
 cd /opt/studybytes/course-service
 git pull --ff-only origin main
 docker compose up -d --build
-curl -f http://localhost:8082/health
+curl -f http://127.0.0.1:8082/health
+curl -f https://dev-api.studybytes.ru/course-service/health
 ```
 
 ## Rollback basics
@@ -205,7 +214,8 @@ Rollback to a previous commit:
 ```bash
 git checkout <commit_sha>
 docker compose up -d --build
-curl -f http://localhost:8082/health
+curl -f http://127.0.0.1:8082/health
+curl -f https://dev-api.studybytes.ru/course-service/health
 ```
 
 Then return to main when fixed:

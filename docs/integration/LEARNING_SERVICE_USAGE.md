@@ -12,6 +12,12 @@ Inside Docker:
 http://course-service:8082
 ```
 
+Do not use the public gateway URL for backend-to-backend calls when LearningService runs in Docker. The public development gateway is available for manual checks only:
+
+```text
+https://dev-api.studybytes.ru/course-service
+```
+
 ## Authentication
 
 Internal CourseService endpoints require:

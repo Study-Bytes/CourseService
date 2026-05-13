@@ -2,6 +2,14 @@
 
 CourseService owns course structure and author-created content. LearningService owns enrollment, attempts, progress and task state.
 
+## Base URLs
+
+| Context | Base URL | Notes |
+| --- | --- | --- |
+| Public development gateway | `https://dev-api.studybytes.ru/course-service` | Browser, Swagger and external manual checks |
+| Docker backend network | `http://course-service:8082` | BFF/LearningService service-to-service calls |
+| Local direct access | `http://localhost:8082` | Local development only |
+
 | API area | Main endpoints | Used by | Auth | Purpose | Frontend exposure |
 | --- | --- | --- | --- | --- | --- |
 | Public catalog | `GET /api/v1/courses`<br>`GET /api/v1/courses/{courseId}` | Site/BFF | Public | Course catalog and course preview data | Safe for frontend |
