@@ -69,6 +69,10 @@ COURSE_SERVICE_DB_USERNAME=postgres
 COURSE_SERVICE_DB_PASSWORD=<real-password>
 COURSE_SERVICE_DB_URL=jdbc:postgresql://course-postgres:5432/course_service
 
+COURSE_SERVICE_FLYWAY_ENABLED=true
+COURSE_SERVICE_FLYWAY_SCHEMA=public
+COURSE_SERVICE_FLYWAY_BASELINE_ON_MIGRATE=false
+
 COURSE_SERVICE_INTERNAL_API_KEY=<real-internal-api-key>
 
 USER_SERVICE_JWT_ISSUER_URI=http://user-service:8081
@@ -157,7 +161,53 @@ Useful checks:
 - JWT verifier points to UserService JWKS.
 - No real secrets are printed in logs.
 
-## 8. Update Version
+
+## 8. Database Migrations
+
+CourseService uses Flyway for database schema changes. On startup, Flyway runs before Hibernate validation. In the production profile, Hibernate uses `ddl-auto=validate`, so it verifies that the database matches the entities but does not create or alter tables.
+
+Expected production behavior:
+
+```text
+Flyway applies pending SQL migrations -> flyway_schema_history is updated -> Hibernate validates schema -> app starts
+```
+
+Check migration status in logs:
+
+```bash
+docker compose logs course-service | grep -i flyway
+```
+
+A clean PostgreSQL volume should be initialized automatically by `V1__init_course_service_schema.sql`. The database should contain the application tables and `flyway_schema_history` after the first successful startup.
+
+To inspect tables on the VPS:
+
+```bash
+docker compose exec course-postgres psql -U "$COURSE_SERVICE_DB_USERNAME" -d "$COURSE_SERVICE_DB_NAME" -c "\dt"
+docker compose exec course-postgres psql -U "$COURSE_SERVICE_DB_USERNAME" -d "$COURSE_SERVICE_DB_NAME" -c "select installed_rank, version, description, success from flyway_schema_history order by installed_rank;"
+```
+
+Do not set `COURSE_SERVICE_JPA_DDL_AUTO=update` in production. That would bypass the migration discipline and allow Hibernate to mutate the schema silently.
+
+For a full local/VPS reset of only CourseService data, stop containers and remove the database volume:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+Use this only for disposable environments. On a real VPS with useful data, create a new `V<next>__*.sql` migration instead of deleting the volume.
+
+Future migration names must follow this pattern:
+
+```text
+src/main/resources/db/migration/V2__short_description.sql
+src/main/resources/db/migration/V3__another_schema_change.sql
+```
+
+Never edit an already-applied migration on a shared or production database.
+
+## 9. Update Version
 
 Pull or copy the new version, then rebuild:
 
@@ -173,7 +223,7 @@ git pull
 docker compose up -d --build
 ```
 
-## 9. Rollback
+## 10. Rollback
 
 If the new version fails:
 
@@ -184,7 +234,7 @@ docker compose up -d --build
 
 Check logs and health endpoints again.
 
-## 10. Shutdown
+## 11. Shutdown
 
 Stop containers without deleting data:
 
