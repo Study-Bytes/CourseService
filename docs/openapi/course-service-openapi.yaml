@@ -411,6 +411,8 @@ paths:
           type: string
           enum:
           - DRAFT
+          - PENDING_REVIEW
+          - CHANGES_REQUESTED
           - PUBLISHED
           - ARCHIVED
       - name: difficulty
@@ -481,6 +483,59 @@ paths:
                 $ref: "#/components/schemas/AdminCourseResponse"
       security:
       - bearerAuth: []
+  /api/v1/admin/courses/{courseId}/submit-review:
+    post:
+      tags:
+      - Admin Course API
+      summary: Submit course for review
+      description: Validates course structure and moves a draft or changes-requested
+        course to pending review.
+      operationId: submitCourseForReview
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/admin/courses/{courseId}/reject:
+    post:
+      tags:
+      - Admin Course API
+      summary: Reject course
+      description: Rejects a pending-review course with a moderation comment.
+      operationId: rejectCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseModerationReviewRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+      security:
+      - bearerAuth: []
   /api/v1/admin/courses/{courseId}/publish:
     post:
       tags:
@@ -540,6 +595,29 @@ paths:
       summary: Archive course
       description: Marks a course as archived.
       operationId: archiveCourse
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/admin/courses/{courseId}/approve:
+    post:
+      tags:
+      - Admin Course API
+      summary: Approve course
+      description: Approves a pending-review course and publishes it.
+      operationId: approveCourse
       parameters:
       - name: courseId
         in: path
@@ -778,6 +856,84 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+  /api/v1/admin/courses/{courseId}/review:
+    get:
+      tags:
+      - Admin Course API
+      summary: Get course review details
+      description: Returns full admin course details for moderation review.
+      operationId: getCourseReview
+      parameters:
+      - name: courseId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCourseResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/admin/courses/moderation:
+    get:
+      tags:
+      - Admin Course API
+      summary: List moderation queue
+      description: Returns pending-review courses ordered by oldest submission first.
+      operationId: listModerationQueue
+      parameters:
+      - name: difficulty
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - BEGINNER
+          - INTERMEDIATE
+          - ADVANCED
+      - name: accessType
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - PUBLIC
+          - UNLISTED
+          - PRIVATE
+      - name: createdByUserId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminCoursePageResponse"
+      security:
+      - bearerAuth: []
 components:
   schemas:
     UpdateModuleRequest:
@@ -1040,6 +1196,8 @@ components:
           type: string
           enum:
           - DRAFT
+          - PENDING_REVIEW
+          - CHANGES_REQUESTED
           - PUBLISHED
           - ARCHIVED
         accessType:
@@ -1067,6 +1225,17 @@ components:
         publishedAt:
           type: string
           format: date-time
+        submittedForReviewAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+        reviewedByUserId:
+          type: integer
+          format: int64
+        reviewComment:
+          type: string
         modules:
           type: array
           items:
@@ -1364,6 +1533,14 @@ components:
       - createdByUserId
       - slug
       - title
+    CourseModerationReviewRequest:
+      type: object
+      properties:
+        reviewComment:
+          type: string
+          minLength: 1
+      required:
+      - reviewComment
     CreateModuleRequest:
       type: object
       properties:
@@ -1390,6 +1567,8 @@ components:
           type: string
           enum:
           - DRAFT
+          - PENDING_REVIEW
+          - CHANGES_REQUESTED
           - PUBLISHED
           - ARCHIVED
         accessType:
@@ -1649,6 +1828,8 @@ components:
           type: string
           enum:
           - DRAFT
+          - PENDING_REVIEW
+          - CHANGES_REQUESTED
           - PUBLISHED
           - ARCHIVED
         accessType:
@@ -1708,6 +1889,8 @@ components:
           type: string
           enum:
           - DRAFT
+          - PENDING_REVIEW
+          - CHANGES_REQUESTED
           - PUBLISHED
           - ARCHIVED
         accessType:
@@ -1836,6 +2019,8 @@ components:
           type: string
           enum:
           - DRAFT
+          - PENDING_REVIEW
+          - CHANGES_REQUESTED
           - PUBLISHED
           - ARCHIVED
         accessType:
@@ -1863,6 +2048,17 @@ components:
         publishedAt:
           type: string
           format: date-time
+        submittedForReviewAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+        reviewedByUserId:
+          type: integer
+          format: int64
+        reviewComment:
+          type: string
   securitySchemes:
     bearerAuth:
       type: http

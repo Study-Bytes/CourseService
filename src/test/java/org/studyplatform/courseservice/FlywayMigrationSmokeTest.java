@@ -31,7 +31,7 @@ class FlywayMigrationSmokeTest {
 
         MigrateResult result = flyway.migrate();
 
-        assertEquals(1, result.migrationsExecuted);
+        assertEquals(2, result.migrationsExecuted);
 
         try (Connection connection = dataSource.getConnection()) {
             assertTrue(tableExists(connection, "flyway_schema_history"));
@@ -40,6 +40,10 @@ class FlywayMigrationSmokeTest {
             assertTrue(tableExists(connection, "course_items"));
             assertTrue(tableExists(connection, "course_item_test_cases"));
             assertTrue(tableExists(connection, "course_item_options"));
+            assertTrue(columnExists(connection, "courses", "submitted_for_review_at"));
+            assertTrue(columnExists(connection, "courses", "reviewed_at"));
+            assertTrue(columnExists(connection, "courses", "reviewed_by_user_id"));
+            assertTrue(columnExists(connection, "courses", "review_comment"));
         }
     }
 
@@ -51,6 +55,24 @@ class FlywayMigrationSmokeTest {
                   and lower(table_name) = ?
                 """)) {
             statement.setString(1, tableName);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                resultSet.next();
+                return resultSet.getInt(1) == 1;
+            }
+        }
+    }
+
+    private boolean columnExists(Connection connection, String tableName, String columnName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                select count(*)
+                from information_schema.columns
+                where lower(table_schema) = 'public'
+                  and lower(table_name) = ?
+                  and lower(column_name) = ?
+                """)) {
+            statement.setString(1, tableName);
+            statement.setString(2, columnName);
 
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
