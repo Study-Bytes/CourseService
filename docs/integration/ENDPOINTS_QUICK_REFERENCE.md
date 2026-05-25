@@ -14,7 +14,8 @@ CourseService owns course structure and author-created content. LearningService 
 | --- | --- | --- | --- | --- | --- |
 | Public catalog | `GET /api/v1/courses`<br>`GET /api/v1/courses/{courseId}` | Site/BFF | Public | Course catalog and course preview data | Safe for frontend |
 | Public item preview | `GET /api/v1/course-items/{itemId}` | Site/BFF | Public | Course item summary/preview | Safe for frontend |
-| Admin course editor | `POST /api/v1/admin/courses`<br>`PUT /api/v1/admin/courses/{courseId}`<br>`POST /api/v1/admin/courses/{courseId}/publish`<br>`POST /api/v1/admin/courses/{courseId}/archive` | BFF creator panel | Bearer JWT, `TEACHER` or `ADMIN` | Create, update, publish and archive courses | Never called directly by Site |
+| Admin course editor | `GET /api/v1/admin/courses`<br>`POST /api/v1/admin/courses`<br>`PUT /api/v1/admin/courses/{courseId}`<br>`POST /api/v1/admin/courses/{courseId}/submit-review`<br>`POST /api/v1/admin/courses/{courseId}/publish`<br>`POST /api/v1/admin/courses/{courseId}/archive` | BFF creator panel | Bearer JWT, `TEACHER` or `ADMIN` | Create, update, submit, publish and archive courses | Never called directly by Site |
+| Admin moderation | `GET /api/v1/admin/courses/moderation`<br>`GET /api/v1/admin/courses/{courseId}/review`<br>`POST /api/v1/admin/courses/{courseId}/approve`<br>`POST /api/v1/admin/courses/{courseId}/reject` | BFF admin moderation panel | Bearer JWT, `ADMIN` only | Review, approve and reject submitted courses | Never called directly by Site |
 | Admin structure editor | `POST /api/v1/admin/courses/{courseId}/modules`<br>`PUT /api/v1/admin/modules/{moduleId}`<br>`DELETE /api/v1/admin/modules/{moduleId}`<br>`POST /api/v1/admin/modules/{moduleId}/items`<br>`PUT /api/v1/admin/course-items/{itemId}`<br>`DELETE /api/v1/admin/course-items/{itemId}` | BFF creator panel | Bearer JWT, `TEACHER` or `ADMIN` | Edit modules and course items | Never called directly by Site |
 | Admin item children | `PUT /api/v1/admin/course-items/{itemId}/content-blocks`<br>`PUT /api/v1/admin/course-items/{itemId}/hints`<br>`PUT /api/v1/admin/course-items/{itemId}/test-cases`<br>`PUT /api/v1/admin/course-items/{itemId}/options` | BFF creator panel | Bearer JWT, `TEACHER` or `ADMIN` | Replace editor-owned item content, hints, tests and options | Never called directly by Site |
 | Internal availability | `GET /api/v1/internal/courses/{courseId}/availability` | LearningService | `X-Internal-Api-Key` | Check publication/access/enrollment settings before enrollment | Do not expose directly |
@@ -72,3 +73,27 @@ Item reorder body:
 Reorder requests must include every current child ID exactly once. Duplicate, missing and foreign IDs return `400 Bad Request`.
 
 CourseService keeps `language` as a string and does not own the execution language allowlist. It only checks that `CODING` and `SQL` items have non-blank `language`; LearningService, CodeExecutorService and frontend decide which language values are executable.
+
+## Course moderation
+
+CourseService owns moderation status and stores review metadata on the course.
+
+```http
+POST /api/v1/admin/courses/{courseId}/submit-review
+GET  /api/v1/admin/courses/moderation
+GET  /api/v1/admin/courses/{courseId}/review
+POST /api/v1/admin/courses/{courseId}/approve
+POST /api/v1/admin/courses/{courseId}/reject
+```
+
+Supported statuses:
+
+```text
+DRAFT
+PENDING_REVIEW
+CHANGES_REQUESTED
+PUBLISHED
+ARCHIVED
+```
+
+BFF can keep frontend-facing teacher URLs such as `/api/v1/teacher/courses/{courseId}/submit-review`, but it should map them to the CourseService admin URL space. CourseService does not expose `/api/v1/teacher/**`.

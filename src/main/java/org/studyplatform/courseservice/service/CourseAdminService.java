@@ -14,6 +14,7 @@ import org.studyplatform.courseservice.dto.admin.AdminCourseResponse;
 import org.studyplatform.courseservice.dto.admin.AdminCourseSummaryResponse;
 import org.studyplatform.courseservice.dto.admin.AdminModuleResponse;
 import org.studyplatform.courseservice.dto.admin.ContentBlockRequest;
+import org.studyplatform.courseservice.dto.admin.CourseModerationReviewRequest;
 import org.studyplatform.courseservice.dto.admin.CreateCourseItemRequest;
 import org.studyplatform.courseservice.dto.admin.CreateCourseRequest;
 import org.studyplatform.courseservice.dto.admin.CreateModuleRequest;
@@ -119,51 +120,42 @@ public class CourseAdminService {
             int page,
             int size
     ) {
-        if (page < 0) {
-            throw new BadRequestException("page must be greater than or equal to 0");
-        }
+        validateAdminPagination(page, size);
 
-        if (size <= 0 || size > MAX_ADMIN_PAGE_SIZE) {
-            throw new BadRequestException("size must be between 1 and " + MAX_ADMIN_PAGE_SIZE);
-        }
-
-        Specification<Course> specification = (root, query, builder) -> builder.conjunction();
-
-        if (status != null) {
-            specification = specification.and((root, query, builder) -> builder.equal(root.get("status"), status));
-        }
-
-        if (difficulty != null) {
-            specification = specification.and((root, query, builder) -> builder.equal(root.get("difficulty"), difficulty));
-        }
-
-        if (accessType != null) {
-            specification = specification.and((root, query, builder) -> builder.equal(root.get("accessType"), accessType));
-        }
-
-        Long effectiveCreatedByUserId = createdByUserId;
-        if (!currentUserService.isAdmin()) {
-            effectiveCreatedByUserId = currentUserService.getCurrentUserId()
-                    .orElseThrow(() -> new BadRequestException("Current teacher user id is missing"));
-        }
-
-        if (effectiveCreatedByUserId != null) {
-            Long ownerId = effectiveCreatedByUserId;
-            specification = specification.and((root, query, builder) -> builder.equal(root.get("createdByUserId"), ownerId));
-        }
-
+        Specification<Course> specification = buildCourseListSpecification(status, difficulty, accessType, createdByUserId);
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Course> coursePage = courseRepository.findAll(specification, pageRequest);
 
-        return new AdminCoursePageResponse(
-                coursePage.getContent().stream()
-                        .map(this::toCourseSummaryResponse)
-                        .toList(),
-                coursePage.getNumber(),
-                coursePage.getSize(),
-                coursePage.getTotalElements(),
-                coursePage.getTotalPages()
+        return toCoursePageResponse(specification, pageRequest);
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('ADMIN')")
+    public AdminCoursePageResponse listModerationQueue(
+            CourseDifficulty difficulty,
+            CourseAccessType accessType,
+            Long createdByUserId,
+            int page,
+            int size
+    ) {
+        validateAdminPagination(page, size);
+
+        Specification<Course> specification = buildCourseListSpecification(
+                CourseStatus.PENDING_REVIEW,
+                difficulty,
+                accessType,
+                createdByUserId
         );
+        PageRequest pageRequest = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Order.asc("submittedForReviewAt").nullsLast(),
+                        Sort.Order.asc("createdAt"),
+                        Sort.Order.asc("id")
+                )
+        );
+
+        return toCoursePageResponse(specification, pageRequest);
     }
 
     @Transactional(readOnly = true)
@@ -176,6 +168,12 @@ public class CourseAdminService {
                 .toList();
 
         return mapper.toCourseResponse(course, modules, items);
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('ADMIN')")
+    public AdminCourseResponse getCourseReview(Long courseId) {
+        return getCourse(courseId);
     }
 
     @Transactional
@@ -229,6 +227,28 @@ public class CourseAdminService {
 
     @Transactional
     @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
+    public AdminCourseResponse submitCourseForReview(Long courseId) {
+        Course course = getCourseOrThrow(courseId);
+        assertCourseStatus(
+                course,
+                Set.of(CourseStatus.DRAFT, CourseStatus.CHANGES_REQUESTED),
+                CourseStatus.PENDING_REVIEW,
+                "submit course for review"
+        );
+        validateCourseForPublish(course);
+
+        course.setStatus(CourseStatus.PENDING_REVIEW);
+        course.setSubmittedForReviewAt(Instant.now());
+        course.setReviewedAt(null);
+        course.setReviewedByUserId(null);
+        course.setReviewComment(null);
+
+        courseRepository.save(course);
+        return getCourse(courseId);
+    }
+
+    @Transactional
+    @PreAuthorize("@courseAdminAuthorizationService.canManageCourse(#courseId)")
     public AdminCourseResponse publishCourse(Long courseId) {
         Course course = getCourseOrThrow(courseId);
         validateCourseForPublish(course);
@@ -238,6 +258,50 @@ public class CourseAdminService {
         if (course.getPublishedAt() == null) {
             course.setPublishedAt(Instant.now());
         }
+
+        courseRepository.save(course);
+        return getCourse(courseId);
+    }
+
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public AdminCourseResponse approveCourse(Long courseId) {
+        Course course = getCourseOrThrow(courseId);
+        assertCourseStatus(
+                course,
+                Set.of(CourseStatus.PENDING_REVIEW),
+                CourseStatus.PUBLISHED,
+                "approve course"
+        );
+        validateCourseForPublish(course);
+
+        Instant now = Instant.now();
+        course.setStatus(CourseStatus.PUBLISHED);
+        course.setPublishedAt(now);
+        course.setReviewedAt(now);
+        course.setReviewedByUserId(getCurrentAdminUserId());
+        course.setReviewComment(null);
+
+        courseRepository.save(course);
+        return getCourse(courseId);
+    }
+
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public AdminCourseResponse rejectCourse(Long courseId, CourseModerationReviewRequest request) {
+        Course course = getCourseOrThrow(courseId);
+        assertCourseStatus(
+                course,
+                Set.of(CourseStatus.PENDING_REVIEW),
+                CourseStatus.CHANGES_REQUESTED,
+                "reject course"
+        );
+
+        Instant now = Instant.now();
+        course.setStatus(CourseStatus.CHANGES_REQUESTED);
+        course.setReviewedAt(now);
+        course.setReviewedByUserId(getCurrentAdminUserId());
+        course.setReviewComment(request.reviewComment().trim());
 
         courseRepository.save(course);
         return getCourse(courseId);
@@ -562,8 +626,88 @@ public class CourseAdminService {
                 course.getCreatedByUserId(),
                 course.getCreatedAt(),
                 course.getUpdatedAt(),
-                course.getPublishedAt()
+                course.getPublishedAt(),
+                course.getSubmittedForReviewAt(),
+                course.getReviewedAt(),
+                course.getReviewedByUserId(),
+                course.getReviewComment()
         );
+    }
+
+    private void validateAdminPagination(int page, int size) {
+        if (page < 0) {
+            throw new BadRequestException("page must be greater than or equal to 0");
+        }
+
+        if (size <= 0 || size > MAX_ADMIN_PAGE_SIZE) {
+            throw new BadRequestException("size must be between 1 and " + MAX_ADMIN_PAGE_SIZE);
+        }
+    }
+
+    private Specification<Course> buildCourseListSpecification(
+            CourseStatus status,
+            CourseDifficulty difficulty,
+            CourseAccessType accessType,
+            Long createdByUserId
+    ) {
+        Specification<Course> specification = (root, query, builder) -> builder.conjunction();
+
+        if (status != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("status"), status));
+        }
+
+        if (difficulty != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("difficulty"), difficulty));
+        }
+
+        if (accessType != null) {
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("accessType"), accessType));
+        }
+
+        Long effectiveCreatedByUserId = createdByUserId;
+        if (!currentUserService.isAdmin()) {
+            effectiveCreatedByUserId = currentUserService.getCurrentUserId()
+                    .orElseThrow(() -> new BadRequestException("Current teacher user id is missing"));
+        }
+
+        if (effectiveCreatedByUserId != null) {
+            Long ownerId = effectiveCreatedByUserId;
+            specification = specification.and((root, query, builder) -> builder.equal(root.get("createdByUserId"), ownerId));
+        }
+
+        return specification;
+    }
+
+    private AdminCoursePageResponse toCoursePageResponse(Specification<Course> specification, PageRequest pageRequest) {
+        Page<Course> coursePage = courseRepository.findAll(specification, pageRequest);
+
+        return new AdminCoursePageResponse(
+                coursePage.getContent().stream()
+                        .map(this::toCourseSummaryResponse)
+                        .toList(),
+                coursePage.getNumber(),
+                coursePage.getSize(),
+                coursePage.getTotalElements(),
+                coursePage.getTotalPages()
+        );
+    }
+
+    private void assertCourseStatus(
+            Course course,
+            Set<CourseStatus> allowedStatuses,
+            CourseStatus targetStatus,
+            String action
+    ) {
+        if (!allowedStatuses.contains(course.getStatus())) {
+            throw new ConflictException(
+                    "Cannot " + action + " from status " + course.getStatus() + " to " + targetStatus
+            );
+        }
+    }
+
+    private Long getCurrentAdminUserId() {
+        return currentUserService.getCurrentUserId()
+                .orElseThrow(() -> new BadRequestException("Current admin user id is missing"));
     }
 
     private AdminCourseItemResponse mapFullItem(CourseItem item) {

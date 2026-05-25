@@ -85,6 +85,8 @@ class PublicCourseControllerIntegrationTest {
                 CourseAccessType.PUBLIC
         ));
         courseRepository.save(course("public-draft-" + System.nanoTime(), 1L, CourseStatus.DRAFT, CourseAccessType.PUBLIC));
+        courseRepository.save(course("public-pending-review-" + System.nanoTime(), 1L, CourseStatus.PENDING_REVIEW, CourseAccessType.PUBLIC));
+        courseRepository.save(course("public-changes-requested-" + System.nanoTime(), 1L, CourseStatus.CHANGES_REQUESTED, CourseAccessType.PUBLIC));
         courseRepository.save(course("public-archived-" + System.nanoTime(), 1L, CourseStatus.ARCHIVED, CourseAccessType.PUBLIC));
         courseRepository.save(course("unlisted-published-" + System.nanoTime(), 1L, CourseStatus.PUBLISHED, CourseAccessType.UNLISTED));
         courseRepository.save(course("private-published-" + System.nanoTime(), 1L, CourseStatus.PUBLISHED, CourseAccessType.PRIVATE));
@@ -127,12 +129,18 @@ class PublicCourseControllerIntegrationTest {
     }
 
     @Test
-    void shouldRejectDraftPrivateAndArchivedCourseDetailsAsNotFound() throws Exception {
+    void shouldRejectNonPublishedAndPrivateCourseDetailsAsNotFound() throws Exception {
         Course draft = courseRepository.save(course("draft-not-public-" + System.nanoTime(), 1L, CourseStatus.DRAFT, CourseAccessType.PUBLIC));
+        Course pendingReview = courseRepository.save(course("pending-not-public-" + System.nanoTime(), 1L, CourseStatus.PENDING_REVIEW, CourseAccessType.PUBLIC));
+        Course changesRequested = courseRepository.save(course("changes-not-public-" + System.nanoTime(), 1L, CourseStatus.CHANGES_REQUESTED, CourseAccessType.PUBLIC));
         Course privateCourse = courseRepository.save(course("private-not-public-" + System.nanoTime(), 1L, CourseStatus.PUBLISHED, CourseAccessType.PRIVATE));
         Course archived = courseRepository.save(course("archived-not-public-" + System.nanoTime(), 1L, CourseStatus.ARCHIVED, CourseAccessType.PUBLIC));
 
         mockMvc.perform(get("/api/v1/courses/{courseId}", draft.getId()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/courses/{courseId}", pendingReview.getId()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/courses/{courseId}", changesRequested.getId()))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/courses/{courseId}", privateCourse.getId()))
                 .andExpect(status().isNotFound());
@@ -168,6 +176,18 @@ class PublicCourseControllerIntegrationTest {
         CourseItem item = itemRepository.save(codingItem(module, "Private item", 0, "python"));
 
         mockMvc.perform(get("/api/v1/course-items/{itemId}", item.getId()))
+                .andExpect(status().isNotFound());
+
+        Course pendingCourse = courseRepository.save(course(
+                "pending-preview-" + System.nanoTime(),
+                1L,
+                CourseStatus.PENDING_REVIEW,
+                CourseAccessType.PUBLIC
+        ));
+        CourseModule pendingModule = moduleRepository.save(module(pendingCourse, "Pending module", 0));
+        CourseItem pendingItem = itemRepository.save(codingItem(pendingModule, "Pending item", 0, "python"));
+
+        mockMvc.perform(get("/api/v1/course-items/{itemId}", pendingItem.getId()))
                 .andExpect(status().isNotFound());
     }
 

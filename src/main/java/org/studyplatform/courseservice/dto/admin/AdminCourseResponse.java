@@ -23,6 +23,10 @@ public record AdminCourseResponse(
         Instant createdAt,
         Instant updatedAt,
         Instant publishedAt,
+        Instant submittedForReviewAt,
+        Instant reviewedAt,
+        Long reviewedByUserId,
+        String reviewComment,
         List<AdminModuleResponse> modules
 ) {
 }

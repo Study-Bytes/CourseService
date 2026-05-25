@@ -53,6 +53,10 @@ public class AdminCourseMapper {
                 course.getCreatedAt(),
                 course.getUpdatedAt(),
                 course.getPublishedAt(),
+                course.getSubmittedForReviewAt(),
+                course.getReviewedAt(),
+                course.getReviewedByUserId(),
+                course.getReviewComment(),
                 moduleResponses
         );
     }

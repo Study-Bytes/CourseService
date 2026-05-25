@@ -100,15 +100,47 @@ The current development configuration expects roles in the `roles` claim, for ex
 ### Course management
 
 ```http
-GET  /api/v1/admin/courses?page=0&size=20&status=DRAFT&difficulty=BEGINNER&accessType=PUBLIC&createdByUserId=123
+GET  /api/v1/admin/courses?page=0&size=20&status=PENDING_REVIEW&difficulty=BEGINNER&accessType=PUBLIC&createdByUserId=123
 POST /api/v1/admin/courses
 GET  /api/v1/admin/courses/{courseId}
 PUT  /api/v1/admin/courses/{courseId}
+POST /api/v1/admin/courses/{courseId}/submit-review
+GET  /api/v1/admin/courses/moderation
+GET  /api/v1/admin/courses/{courseId}/review
+POST /api/v1/admin/courses/{courseId}/approve
+POST /api/v1/admin/courses/{courseId}/reject
 POST /api/v1/admin/courses/{courseId}/publish
 POST /api/v1/admin/courses/{courseId}/archive
 ```
 
 `GET /api/v1/admin/courses` returns a paginated admin course list. `ADMIN` can list all courses. `TEACHER` can list only courses where `createdByUserId` equals the authenticated user id. Default sorting is `createdAt DESC`.
+
+Course statuses are:
+
+```text
+DRAFT
+PENDING_REVIEW
+CHANGES_REQUESTED
+PUBLISHED
+ARCHIVED
+```
+
+Moderation uses the CourseService admin URL space. BFF may expose frontend-facing teacher URLs, but CourseService does not expose `/api/v1/teacher/**`.
+
+Moderation lifecycle:
+
+```text
+DRAFT -> PENDING_REVIEW -> PUBLISHED -> ARCHIVED
+DRAFT -> PENDING_REVIEW -> CHANGES_REQUESTED -> PENDING_REVIEW -> PUBLISHED
+```
+
+`POST /api/v1/admin/courses/{courseId}/submit-review` is available to `TEACHER` and `ADMIN`. A teacher can submit only own courses. It runs the same full course structure validation used by publishing, moves `DRAFT` or `CHANGES_REQUESTED` courses to `PENDING_REVIEW`, sets `submittedForReviewAt`, and clears previous review fields.
+
+`GET /api/v1/admin/courses/moderation`, `GET /api/v1/admin/courses/{courseId}/review`, `POST /api/v1/admin/courses/{courseId}/approve` and `POST /api/v1/admin/courses/{courseId}/reject` are `ADMIN` only. The moderation queue returns only `PENDING_REVIEW` courses, sorted by `submittedForReviewAt ASC`.
+
+Approving is the moderation-specific publication endpoint: it moves only `PENDING_REVIEW` courses to `PUBLISHED`, sets `publishedAt`, `reviewedAt`, `reviewedByUserId`, and clears `reviewComment`. Rejecting moves only `PENDING_REVIEW` courses to `CHANGES_REQUESTED` and requires a non-blank `reviewComment`.
+
+Invalid moderation transitions return `409 Conflict` and leave the course unchanged. The legacy `/publish` endpoint remains available for old callers.
 
 ### Module management
 
@@ -176,7 +208,7 @@ Validation rules:
 - `THEORY` and `FILE` items must not have test cases or quiz options. Before publishing, they must contain either `statement` or content blocks.
 - `THEORY`, `QUIZ` and `FILE` items do not automatically receive `language = "python"`.
 
-Publishing runs full structure validation before changing course status to `PUBLISHED`. Invalid courses remain unchanged and return `400 Bad Request` with a clear message.
+Publishing and submit-for-review run full structure validation before changing course status. Invalid courses remain unchanged and return `400 Bad Request` with a clear message.
 
 ## Internal API
 

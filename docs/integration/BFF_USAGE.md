@@ -62,6 +62,25 @@ Course.createdByUserId == JWT.sub
 
 BFF should forward the original user access token to CourseService for creator/admin pages.
 
+CourseService keeps all course moderation endpoints under `/api/v1/admin/**`. If Site calls frontend-facing teacher routes, BFF should map them to CourseService admin routes:
+
+```text
+Site POST /api/v1/teacher/courses/{courseId}/submit-review
+BFF  POST /api/v1/admin/courses/{courseId}/submit-review -> CourseService
+```
+
+Moderation endpoints:
+
+```http
+POST /api/v1/admin/courses/{courseId}/submit-review
+GET  /api/v1/admin/courses/moderation
+GET  /api/v1/admin/courses/{courseId}/review
+POST /api/v1/admin/courses/{courseId}/approve
+POST /api/v1/admin/courses/{courseId}/reject
+```
+
+`submit-review` allows `TEACHER` for own courses and `ADMIN` for any course. Queue, review, approve and reject are `ADMIN` only.
+
 ## Course Page Flow
 
 Recommended course page flow:

@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.studyplatform.courseservice.repository.CourseItemContentBlockRepository;
 import org.studyplatform.courseservice.repository.CourseItemHintRepository;
@@ -28,10 +29,13 @@ import org.studyplatform.courseservice.entity.enums.ComparisonMode;
 
 import java.time.Instant;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -200,6 +204,328 @@ class AdminCourseControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
                 .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void shouldSubmitCourseForReviewAndExposeModerationFields() throws Exception {
+        Long courseId = createPublishableCourse("submit-review-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
+                .andExpect(jsonPath("$.submittedForReviewAt").exists())
+                .andExpect(jsonPath("$.reviewedAt").value(nullValue()))
+                .andExpect(jsonPath("$.reviewedByUserId").value(nullValue()))
+                .andExpect(jsonPath("$.reviewComment").value(nullValue()));
+
+        mockMvc.perform(get("/api/v1/admin/courses")
+                        .param("status", "PENDING_REVIEW"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id").value(courseId))
+                .andExpect(jsonPath("$.content[0].status").value("PENDING_REVIEW"))
+                .andExpect(jsonPath("$.content[0].submittedForReviewAt").exists())
+                .andExpect(jsonPath("$.content[0].reviewedAt").value(nullValue()))
+                .andExpect(jsonPath("$.content[0].reviewedByUserId").value(nullValue()))
+                .andExpect(jsonPath("$.content[0].reviewComment").value(nullValue()));
+    }
+
+    @Test
+    void shouldRejectTeacherSubmittingForeignCourseForReview() throws Exception {
+        Course course = seedCourse(1L, "submit-review-foreign-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", course.getId())
+                        .with(user("2").roles("TEACHER")))
+                .andExpect(status().isForbidden());
+
+        assertEquals(
+                CourseStatus.DRAFT,
+                courseRepository.findById(course.getId()).orElseThrow().getStatus()
+        );
+    }
+
+    @Test
+    void shouldAllowAdminSubmittingAnyCourseForReview() throws Exception {
+        Course course = seedPublishableCourse(10L, "submit-review-admin-any-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", course.getId())
+                        .with(user("99").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
+                .andExpect(jsonPath("$.submittedForReviewAt").exists());
+    }
+
+    @Test
+    void shouldRejectSubmitReviewForInvalidCourseStructureAndKeepDraftStatus() throws Exception {
+        Long courseId = createCourse("submit-review-invalid-structure-" + System.nanoTime());
+        Long moduleId = createModule(courseId, "Theory", 0);
+        createTheoryItem(moduleId, "Empty theory", 0, null);
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("must have statement or content blocks before publishing")));
+
+        Course course = courseRepository.findById(courseId).orElseThrow();
+        assertEquals(CourseStatus.DRAFT, course.getStatus());
+        assertNull(course.getSubmittedForReviewAt());
+    }
+
+    @Test
+    @WithMockUser(username = "99", roles = "ADMIN")
+    void shouldFilterAdminCourseListByModerationStatusesAndExposeModerationFields() throws Exception {
+        Instant submittedAt = Instant.parse("2026-05-17T12:00:00Z");
+        Instant reviewedAt = Instant.parse("2026-05-17T12:05:00Z");
+        Course pending = seedCourseWithModeration(
+                10L,
+                "admin-list-pending-" + System.nanoTime(),
+                CourseStatus.PENDING_REVIEW,
+                submittedAt,
+                null,
+                null,
+                null
+        );
+        Course changesRequested = seedCourseWithModeration(
+                10L,
+                "admin-list-changes-" + System.nanoTime(),
+                CourseStatus.CHANGES_REQUESTED,
+                submittedAt,
+                reviewedAt,
+                99L,
+                "Please improve the quiz."
+        );
+
+        mockMvc.perform(get("/api/v1/admin/courses")
+                        .param("status", "PENDING_REVIEW")
+                        .param("createdByUserId", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id").value(pending.getId()))
+                .andExpect(jsonPath("$.content[0].submittedForReviewAt").value("2026-05-17T12:00:00Z"))
+                .andExpect(jsonPath("$.content[0].reviewComment").value(nullValue()));
+
+        mockMvc.perform(get("/api/v1/admin/courses")
+                        .param("status", "CHANGES_REQUESTED")
+                        .param("createdByUserId", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id").value(changesRequested.getId()))
+                .andExpect(jsonPath("$.content[0].reviewedAt").value("2026-05-17T12:05:00Z"))
+                .andExpect(jsonPath("$.content[0].reviewedByUserId").value(99))
+                .andExpect(jsonPath("$.content[0].reviewComment").value("Please improve the quiz."));
+    }
+
+    @Test
+    @WithMockUser(username = "99", roles = "ADMIN")
+    void shouldListModerationQueueOldestSubmissionFirst() throws Exception {
+        Course older = seedCourseWithModeration(
+                10L,
+                "moderation-older-" + System.nanoTime(),
+                CourseStatus.PENDING_REVIEW,
+                Instant.parse("2026-05-17T10:00:00Z"),
+                null,
+                null,
+                null
+        );
+        Course newer = seedCourseWithModeration(
+                11L,
+                "moderation-newer-" + System.nanoTime(),
+                CourseStatus.PENDING_REVIEW,
+                Instant.parse("2026-05-17T12:00:00Z"),
+                null,
+                null,
+                null
+        );
+        seedCourse(12L, "moderation-draft-" + System.nanoTime());
+
+        mockMvc.perform(get("/api/v1/admin/courses/moderation")
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].id").value(older.getId()))
+                .andExpect(jsonPath("$.content[1].id").value(newer.getId()))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void shouldReturnReviewDetailsForAdminOnly() throws Exception {
+        Long courseId = createPublishableCourse("review-details-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/admin/courses/{courseId}/review", courseId)
+                        .with(user("99").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(courseId))
+                .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
+                .andExpect(jsonPath("$.submittedForReviewAt").exists())
+                .andExpect(jsonPath("$.modules", hasSize(1)))
+                .andExpect(jsonPath("$.modules[0].items", hasSize(1)));
+
+        mockMvc.perform(get("/api/v1/admin/courses/{courseId}/review", courseId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldApproveSubmittedCourseAndSetReviewFields() throws Exception {
+        Long courseId = createPublishableCourse("approve-course-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/approve", courseId)
+                        .with(user("99").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.publishedAt").exists())
+                .andExpect(jsonPath("$.submittedForReviewAt").exists())
+                .andExpect(jsonPath("$.reviewedAt").exists())
+                .andExpect(jsonPath("$.reviewedByUserId").value(99))
+                .andExpect(jsonPath("$.reviewComment").value(nullValue()));
+    }
+
+    @Test
+    void shouldRejectSubmittedCourseAndClearReviewFieldsOnResubmission() throws Exception {
+        Long courseId = createPublishableCourse("reject-course-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/reject", courseId)
+                        .with(user("99").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reviewComment": "Please add one more practice item."
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CHANGES_REQUESTED"))
+                .andExpect(jsonPath("$.reviewedAt").exists())
+                .andExpect(jsonPath("$.reviewedByUserId").value(99))
+                .andExpect(jsonPath("$.reviewComment").value("Please add one more practice item."));
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
+                .andExpect(jsonPath("$.reviewedAt").value(nullValue()))
+                .andExpect(jsonPath("$.reviewedByUserId").value(nullValue()))
+                .andExpect(jsonPath("$.reviewComment").value(nullValue()));
+    }
+
+    @Test
+    void shouldRejectBlankModerationCommentAndKeepPendingStatus() throws Exception {
+        Long courseId = createPublishableCourse("reject-blank-comment-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/reject", courseId)
+                        .with(user("99").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reviewComment": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("reviewComment")));
+
+        Course course = courseRepository.findById(courseId).orElseThrow();
+        assertEquals(CourseStatus.PENDING_REVIEW, course.getStatus());
+        assertNull(course.getReviewComment());
+    }
+
+    @Test
+    void shouldRejectTeachersCallingAdminOnlyModerationEndpoints() throws Exception {
+        Long courseId = createPublishableCourse("teacher-moderation-denied-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/submit-review", courseId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/admin/courses/moderation"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/approve", courseId))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/reject", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reviewComment": "Needs changes."
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectInvalidModerationTransitionsWithoutMutation() throws Exception {
+        Course pending = seedCourseWithModeration(
+                1L,
+                "invalid-submit-pending-" + System.nanoTime(),
+                CourseStatus.PENDING_REVIEW,
+                Instant.parse("2026-05-17T10:00:00Z"),
+                null,
+                null,
+                null
+        );
+        assertConflictAndUnchanged(
+                post("/api/v1/admin/courses/{courseId}/submit-review", pending.getId()),
+                pending.getId(),
+                CourseStatus.PENDING_REVIEW
+        );
+
+        Course published = seedCourse(1L, "invalid-submit-published-" + System.nanoTime(), CourseStatus.PUBLISHED, CourseDifficulty.BEGINNER, CourseAccessType.PUBLIC);
+        assertConflictAndUnchanged(
+                post("/api/v1/admin/courses/{courseId}/submit-review", published.getId()),
+                published.getId(),
+                CourseStatus.PUBLISHED
+        );
+
+        Course archived = seedCourse(1L, "invalid-submit-archived-" + System.nanoTime(), CourseStatus.ARCHIVED, CourseDifficulty.BEGINNER, CourseAccessType.PUBLIC);
+        assertConflictAndUnchanged(
+                post("/api/v1/admin/courses/{courseId}/submit-review", archived.getId()),
+                archived.getId(),
+                CourseStatus.ARCHIVED
+        );
+
+        for (CourseStatus status : new CourseStatus[] {
+                CourseStatus.DRAFT,
+                CourseStatus.CHANGES_REQUESTED,
+                CourseStatus.PUBLISHED,
+                CourseStatus.ARCHIVED
+        }) {
+            Course course = seedCourse(1L, "invalid-approve-" + status + "-" + System.nanoTime(), status, CourseDifficulty.BEGINNER, CourseAccessType.PUBLIC);
+            assertConflictAndUnchanged(
+                    post("/api/v1/admin/courses/{courseId}/approve", course.getId())
+                            .with(user("99").roles("ADMIN")),
+                    course.getId(),
+                    status
+            );
+        }
+
+        for (CourseStatus status : new CourseStatus[] {
+                CourseStatus.DRAFT,
+                CourseStatus.CHANGES_REQUESTED,
+                CourseStatus.PUBLISHED,
+                CourseStatus.ARCHIVED
+        }) {
+            Course course = seedCourse(1L, "invalid-reject-" + status + "-" + System.nanoTime(), status, CourseDifficulty.BEGINNER, CourseAccessType.PUBLIC);
+            assertConflictAndUnchanged(
+                    post("/api/v1/admin/courses/{courseId}/reject", course.getId())
+                            .with(user("99").roles("ADMIN"))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "reviewComment": "Needs changes."
+                                    }
+                                    """),
+                    course.getId(),
+                    status
+            );
+        }
     }
 
     @Test
@@ -742,8 +1068,76 @@ class AdminCourseControllerIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PUBLISHED"));
     }
 
+    private Long createPublishableCourse(String slug) throws Exception {
+        Long courseId = createCourse(slug);
+        Long moduleId = createModule(courseId, "Moderation", 0);
+        createCodingItem(moduleId, "Review task", 0);
+        return courseId;
+    }
+
+    private void assertConflictAndUnchanged(
+            RequestBuilder requestBuilder,
+            Long courseId,
+            CourseStatus expectedStatus
+    ) throws Exception {
+        mockMvc.perform(requestBuilder)
+                .andExpect(status().isConflict());
+
+        assertEquals(
+                expectedStatus,
+                courseRepository.findById(courseId).orElseThrow().getStatus()
+        );
+    }
+
     private Course seedCourse(Long ownerId, String slug) {
         return seedCourse(ownerId, slug, CourseStatus.DRAFT, CourseDifficulty.BEGINNER, CourseAccessType.PUBLIC);
+    }
+
+    private Course seedPublishableCourse(Long ownerId, String slug) {
+        Course course = seedCourse(ownerId, slug);
+        CourseModule module = moduleRepository.save(CourseModule.builder()
+                .course(course)
+                .title("Seeded module")
+                .description("Seeded module for moderation tests.")
+                .orderIndex(0)
+                .build());
+
+        itemRepository.save(CourseItem.builder()
+                .module(module)
+                .title("Seeded coding item")
+                .itemType(CourseItemType.CODING)
+                .statement("Read n and print n squared.")
+                .starterCode("n = int(input())\nprint(n * n)\n")
+                .language("python")
+                .orderIndex(0)
+                .timeLimitMs(1500)
+                .memoryLimitMb(256)
+                .outputLimitKb(256)
+                .networkDisabled(true)
+                .readOnlyFs(true)
+                .comparisonMode(ComparisonMode.EXACT)
+                .normalizeLineEndings(true)
+                .trimTrailingWhitespaces(true)
+                .build());
+
+        return course;
+    }
+
+    private Course seedCourseWithModeration(
+            Long ownerId,
+            String slug,
+            CourseStatus status,
+            Instant submittedForReviewAt,
+            Instant reviewedAt,
+            Long reviewedByUserId,
+            String reviewComment
+    ) {
+        Course course = seedCourse(ownerId, slug, status, CourseDifficulty.BEGINNER, CourseAccessType.PUBLIC);
+        course.setSubmittedForReviewAt(submittedForReviewAt);
+        course.setReviewedAt(reviewedAt);
+        course.setReviewedByUserId(reviewedByUserId);
+        course.setReviewComment(reviewComment);
+        return courseRepository.save(course);
     }
 
     private Course seedCourse(

@@ -21,6 +21,7 @@ import org.studyplatform.courseservice.dto.admin.AdminCourseItemResponse;
 import org.studyplatform.courseservice.dto.admin.AdminCoursePageResponse;
 import org.studyplatform.courseservice.dto.admin.AdminCourseResponse;
 import org.studyplatform.courseservice.dto.admin.AdminModuleResponse;
+import org.studyplatform.courseservice.dto.admin.CourseModerationReviewRequest;
 import org.studyplatform.courseservice.dto.admin.CreateCourseItemRequest;
 import org.studyplatform.courseservice.dto.admin.CreateCourseRequest;
 import org.studyplatform.courseservice.dto.admin.CreateModuleRequest;
@@ -60,6 +61,18 @@ public class AdminCourseController {
         return adminService.listCourses(status, difficulty, accessType, createdByUserId, page, size);
     }
 
+    @GetMapping("/courses/moderation")
+    @Operation(summary = "List moderation queue", description = "Returns pending-review courses ordered by oldest submission first.")
+    public AdminCoursePageResponse listModerationQueue(
+            @RequestParam(required = false) CourseDifficulty difficulty,
+            @RequestParam(required = false) CourseAccessType accessType,
+            @RequestParam(required = false) Long createdByUserId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return adminService.listModerationQueue(difficulty, accessType, createdByUserId, page, size);
+    }
+
     @PostMapping("/courses")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create course", description = "Creates a draft course with base metadata.")
@@ -73,6 +86,12 @@ public class AdminCourseController {
         return adminService.getCourse(courseId);
     }
 
+    @GetMapping("/courses/{courseId}/review")
+    @Operation(summary = "Get course review details", description = "Returns full admin course details for moderation review.")
+    public AdminCourseResponse getCourseReview(@PathVariable Long courseId) {
+        return adminService.getCourseReview(courseId);
+    }
+
     @PutMapping("/courses/{courseId}")
     @Operation(summary = "Update course", description = "Updates course metadata.")
     public AdminCourseResponse updateCourse(
@@ -82,10 +101,31 @@ public class AdminCourseController {
         return adminService.updateCourse(courseId, request);
     }
 
+    @PostMapping("/courses/{courseId}/submit-review")
+    @Operation(summary = "Submit course for review", description = "Validates course structure and moves a draft or changes-requested course to pending review.")
+    public AdminCourseResponse submitCourseForReview(@PathVariable Long courseId) {
+        return adminService.submitCourseForReview(courseId);
+    }
+
     @PostMapping("/courses/{courseId}/publish")
     @Operation(summary = "Publish course", description = "Marks a course as published and sets publishedAt if missing.")
     public AdminCourseResponse publishCourse(@PathVariable Long courseId) {
         return adminService.publishCourse(courseId);
+    }
+
+    @PostMapping("/courses/{courseId}/approve")
+    @Operation(summary = "Approve course", description = "Approves a pending-review course and publishes it.")
+    public AdminCourseResponse approveCourse(@PathVariable Long courseId) {
+        return adminService.approveCourse(courseId);
+    }
+
+    @PostMapping("/courses/{courseId}/reject")
+    @Operation(summary = "Reject course", description = "Rejects a pending-review course with a moderation comment.")
+    public AdminCourseResponse rejectCourse(
+            @PathVariable Long courseId,
+            @Valid @RequestBody CourseModerationReviewRequest request
+    ) {
+        return adminService.rejectCourse(courseId, request);
     }
 
     @PostMapping("/courses/{courseId}/archive")

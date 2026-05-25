@@ -79,6 +79,18 @@ public class Course {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Column(name = "submitted_for_review_at")
+    private Instant submittedForReviewAt;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
+    @Column(name = "reviewed_by_user_id")
+    private Long reviewedByUserId;
+
+    @Column(name = "review_comment", columnDefinition = "TEXT")
+    private String reviewComment;
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();
