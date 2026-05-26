@@ -74,6 +74,25 @@ Reorder requests must include every current child ID exactly once. Duplicate, mi
 
 CourseService keeps `language` as a string and does not own the execution language allowlist. It only checks that `CODING` and `SQL` items have non-blank `language`; LearningService, CodeExecutorService and frontend decide which language values are executable.
 
+## Module deadlines
+
+CourseService stores optional module deadlines as `deadlineAt` on course modules and returns the field in admin and public course structure responses.
+
+```json
+{
+  "id": 10,
+  "title": "SQL basics",
+  "orderIndex": 1,
+  "deadlineAt": "2026-06-01T23:59:00"
+}
+```
+
+BFF/Site should call LearningService deadline-state only when `deadlineAt` is not `null`:
+
+```http
+GET /api/v1/learn/courses/{courseId}/modules/{moduleId}/deadline-state?deadlineAt={deadlineAt}
+```
+
 ## Course moderation
 
 CourseService owns moderation status and stores review metadata on the course.

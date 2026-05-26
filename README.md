@@ -151,6 +151,19 @@ PUT    /api/v1/admin/modules/{moduleId}
 DELETE /api/v1/admin/modules/{moduleId}
 ```
 
+Modules can optionally store `deadlineAt`. Admin create/update payloads accept it in local timestamp format:
+
+```json
+{
+  "title": "SQL basics",
+  "description": "Practice module.",
+  "orderIndex": 0,
+  "deadlineAt": "2026-06-01T23:59:00"
+}
+```
+
+If a module has no deadline, CourseService returns `"deadlineAt": null`. Public course details expose this field so BFF/Site can call LearningService module deadline-state checks for enrolled users.
+
 Module reorder request:
 
 ```json

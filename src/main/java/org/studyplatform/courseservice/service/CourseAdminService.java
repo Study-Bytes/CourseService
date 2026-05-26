@@ -327,6 +327,7 @@ public class CourseAdminService {
                 .title(request.title().trim())
                 .description(blankToNull(request.description()))
                 .orderIndex(request.orderIndex())
+                .deadlineAt(request.deadlineAt())
                 .build();
 
         CourseModule saved = moduleRepository.save(module);
@@ -372,6 +373,10 @@ public class CourseAdminService {
         if (request.orderIndex() != null) {
             assertOrderIndexAvailableForModule(module.getCourse().getId(), request.orderIndex(), moduleId);
             module.setOrderIndex(request.orderIndex());
+        }
+
+        if (request.deadlineAtProvided()) {
+            module.setDeadlineAt(request.deadlineAt());
         }
 
         CourseModule saved = moduleRepository.save(module);

@@ -112,6 +112,7 @@ LearningService stores:
 LearningService should not duplicate CourseService-owned author content:
 
 - course modules;
+- module deadlines;
 - course item statement;
 - content blocks;
 - hints;
@@ -125,3 +126,5 @@ Store CourseService identifiers instead:
 - `courseId`;
 - `moduleId`;
 - `itemId`.
+
+Module deadline values come from CourseService module responses as `deadlineAt`. LearningService should continue to evaluate deadline state from the value passed by the caller and does not need to store deadlines itself.

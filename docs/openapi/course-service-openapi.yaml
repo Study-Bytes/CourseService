@@ -941,14 +941,18 @@ components:
       properties:
         title:
           type: string
-          maxLength: 200
-          minLength: 0
+          writeOnly: true
         description:
           type: string
+          writeOnly: true
         orderIndex:
           type: integer
           format: int32
-          minimum: 0
+          writeOnly: true
+        deadlineAt:
+          type: string
+          format: date-time
+          writeOnly: true
     AdminContentBlockResponse:
       type: object
       properties:
@@ -1075,6 +1079,9 @@ components:
         orderIndex:
           type: integer
           format: int32
+        deadlineAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -1554,6 +1561,9 @@ components:
           type: integer
           format: int32
           minimum: 0
+        deadlineAt:
+          type: string
+          format: date-time
       required:
       - orderIndex
       - title
@@ -1947,6 +1957,9 @@ components:
         orderIndex:
           type: integer
           format: int32
+        deadlineAt:
+          type: string
+          format: date-time
         items:
           type: array
           items:
