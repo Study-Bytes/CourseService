@@ -21,6 +21,8 @@ import org.studyplatform.courseservice.repository.CourseItemTestCaseRepository;
 import org.studyplatform.courseservice.repository.CourseModuleRepository;
 import org.studyplatform.courseservice.repository.CourseRepository;
 
+import java.time.LocalDateTime;
+
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
@@ -107,6 +109,7 @@ class PublicCourseControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(seeded.courseId()))
                 .andExpect(jsonPath("$.modules", hasSize(1)))
+                .andExpect(jsonPath("$.modules[0].deadlineAt").value("2026-06-01T23:59:00"))
                 .andExpect(jsonPath("$.modules[0].items", hasSize(2)))
                 .andExpect(jsonPath("$.modules[0].items[0].id").value(seeded.codingItemId()))
                 .andExpect(content().string(not(containsString("expectedOutput"))))
@@ -198,7 +201,9 @@ class PublicCourseControllerIntegrationTest {
                 CourseStatus.PUBLISHED,
                 accessType
         ));
-        CourseModule module = moduleRepository.save(module(course, "Basics", 0));
+        CourseModule module = module(course, "Basics", 0);
+        module.setDeadlineAt(LocalDateTime.parse("2026-06-01T23:59:00"));
+        module = moduleRepository.save(module);
         CourseItem codingItem = itemRepository.save(codingItem(module, "Print square", 0, "python"));
         CourseItem quizItem = itemRepository.save(quizItem(module, "Quiz item", 1));
 

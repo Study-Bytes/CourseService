@@ -28,6 +28,7 @@ import org.studyplatform.courseservice.entity.enums.CourseItemType;
 import org.studyplatform.courseservice.entity.enums.ComparisonMode;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -204,6 +205,79 @@ class AdminCourseControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
                 .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void shouldCreateUpdateAndReturnModuleDeadline() throws Exception {
+        Long courseId = createCourse("module-deadline-" + System.nanoTime());
+
+        String createRequest = """
+                {
+                  "title": "SQL basics",
+                  "description": "Module with deadline.",
+                  "orderIndex": 0,
+                  "deadlineAt": "2026-06-01T23:59:00"
+                }
+                """;
+
+        String createResponse = mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequest))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.courseId").value(courseId))
+                .andExpect(jsonPath("$.deadlineAt").value("2026-06-01T23:59:00"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        Long moduleId = extractLong(createResponse, "id");
+        assertEquals(
+                LocalDateTime.parse("2026-06-01T23:59:00"),
+                moduleRepository.findById(moduleId).orElseThrow().getDeadlineAt()
+        );
+
+        String titleOnlyUpdateRequest = """
+                {
+                  "title": "SQL basics updated"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/modules/{moduleId}", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(titleOnlyUpdateRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("SQL basics updated"))
+                .andExpect(jsonPath("$.deadlineAt").value("2026-06-01T23:59:00"));
+
+        String updateRequest = """
+                {
+                  "deadlineAt": "2026-06-05T12:30:00"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/modules/{moduleId}", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deadlineAt").value("2026-06-05T12:30:00"));
+
+        mockMvc.perform(get("/api/v1/admin/courses/{courseId}", courseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modules[0].deadlineAt").value("2026-06-05T12:30:00"));
+
+        String clearRequest = """
+                {
+                  "deadlineAt": null
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/modules/{moduleId}", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(clearRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deadlineAt").value(nullValue()));
+
+        assertNull(moduleRepository.findById(moduleId).orElseThrow().getDeadlineAt());
     }
 
     @Test
@@ -1219,9 +1293,10 @@ class AdminCourseControllerIntegrationTest {
 
         String response = mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(request))
+                .content(request))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.courseId").value(courseId))
+                .andExpect(jsonPath("$.deadlineAt").value(nullValue()))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

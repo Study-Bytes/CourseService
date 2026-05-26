@@ -1,6 +1,7 @@
 package org.studyplatform.courseservice.dto.admin;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record AdminModuleResponse(
@@ -9,6 +10,7 @@ public record AdminModuleResponse(
         String title,
         String description,
         Integer orderIndex,
+        LocalDateTime deadlineAt,
         Instant createdAt,
         Instant updatedAt,
         List<AdminCourseItemResponse> items

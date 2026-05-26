@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -57,6 +58,9 @@ public class CourseModule {
 
     @Column(name = "order_index", nullable = false)
     private Integer orderIndex;
+
+    @Column(name = "deadline_at")
+    private LocalDateTime deadlineAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

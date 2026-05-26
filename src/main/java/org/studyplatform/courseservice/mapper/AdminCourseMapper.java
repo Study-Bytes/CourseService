@@ -73,6 +73,7 @@ public class AdminCourseMapper {
                 module.getTitle(),
                 module.getDescription(),
                 module.getOrderIndex(),
+                module.getDeadlineAt(),
                 module.getCreatedAt(),
                 module.getUpdatedAt(),
                 itemResponses
