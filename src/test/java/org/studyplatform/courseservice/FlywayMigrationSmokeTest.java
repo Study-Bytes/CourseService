@@ -31,7 +31,7 @@ class FlywayMigrationSmokeTest {
 
         MigrateResult result = flyway.migrate();
 
-        assertEquals(3, result.migrationsExecuted);
+        assertEquals(4, result.migrationsExecuted);
 
         try (Connection connection = dataSource.getConnection()) {
             assertTrue(tableExists(connection, "flyway_schema_history"));
@@ -45,6 +45,8 @@ class FlywayMigrationSmokeTest {
             assertTrue(columnExists(connection, "courses", "reviewed_by_user_id"));
             assertTrue(columnExists(connection, "courses", "review_comment"));
             assertTrue(columnExists(connection, "course_modules", "deadline_at"));
+            assertTrue(columnExists(connection, "course_modules", "deadline_type"));
+            assertTrue(columnExists(connection, "course_modules", "time_limit_minutes"));
         }
     }
 

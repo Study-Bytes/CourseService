@@ -127,4 +127,4 @@ Store CourseService identifiers instead:
 - `moduleId`;
 - `itemId`.
 
-Module deadline values come from CourseService module responses as `deadlineAt`. LearningService should continue to evaluate deadline state from the value passed by the caller and does not need to store deadlines itself.
+Module deadline values come from CourseService module responses as `deadlineType`, `deadlineAt` and `timeLimitMinutes`. LearningService should continue to evaluate deadline state from the effective `deadlineAt` passed by the caller and does not need to store deadlines itself.

@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -72,6 +73,23 @@ public class GlobalExceptionHandler {
         }
 
         log.warn("Handled API validation error status={} method={} path={} message={}",
+                HttpStatus.BAD_REQUEST.value(), request.getMethod(), pathWithQuery(request), message);
+        return build(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(
+            HttpMessageNotReadableException exception,
+            HttpServletRequest request
+    ) {
+        String message = "Invalid request body";
+        Throwable cause = exception.getMostSpecificCause();
+
+        if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
+            message += ": " + cause.getMessage();
+        }
+
+        log.warn("Handled API request body error status={} method={} path={} message={}",
                 HttpStatus.BAD_REQUEST.value(), request.getMethod(), pathWithQuery(request), message);
         return build(HttpStatus.BAD_REQUEST, message);
     }

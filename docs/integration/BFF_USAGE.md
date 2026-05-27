@@ -100,13 +100,13 @@ BFF should build a page model from:
 - LearningService enrollment, item status, completion and progress;
 - UserService current user/profile data when needed.
 
-CourseService returns `deadlineAt` on each module. If it is not `null`, BFF/Site should call LearningService without changing the timestamp format:
+CourseService returns `deadlineType`, `deadlineAt` and `timeLimitMinutes` on each module. For `ABSOLUTE` modules, BFF/Site should call LearningService without changing the timestamp format:
 
 ```http
 GET /api/v1/learn/courses/{courseId}/modules/{moduleId}/deadline-state?deadlineAt={deadlineAt}
 ```
 
-Always URL-encode the `deadlineAt` query value when building the request. Modules with `deadlineAt: null` do not need a deadline-state call.
+Always URL-encode the `deadlineAt` query value when building the request. Modules with `deadlineType: NONE` do not need a deadline-state call. Modules with `deadlineType: RELATIVE_FROM_START` expose `timeLimitMinutes` so BFF/Site can render or derive timer-from-start behavior.
 
 ## Enrolled Content Flow
 

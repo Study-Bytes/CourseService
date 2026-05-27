@@ -76,18 +76,30 @@ CourseService keeps `language` as a string and does not own the execution langua
 
 ## Module deadlines
 
-CourseService stores optional module deadlines as `deadlineAt` on course modules and returns the field in admin and public course structure responses.
+CourseService stores optional module deadline settings and returns them in admin and public course structure responses.
 
 ```json
 {
   "id": 10,
   "title": "SQL basics",
   "orderIndex": 1,
-  "deadlineAt": "2026-06-01T23:59:00"
+  "deadlineType": "ABSOLUTE",
+  "deadlineAt": "2026-06-01T23:59:00",
+  "timeLimitMinutes": null
 }
 ```
 
-BFF/Site should call LearningService deadline-state only when `deadlineAt` is not `null`:
+For timer-from-start modules, CourseService returns:
+
+```json
+{
+  "deadlineType": "RELATIVE_FROM_START",
+  "deadlineAt": null,
+  "timeLimitMinutes": 180
+}
+```
+
+BFF/Site should call LearningService deadline-state with an effective `deadlineAt` when one is available:
 
 ```http
 GET /api/v1/learn/courses/{courseId}/modules/{moduleId}/deadline-state?deadlineAt={deadlineAt}
