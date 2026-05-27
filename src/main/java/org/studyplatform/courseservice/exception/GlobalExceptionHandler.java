@@ -1,16 +1,20 @@
 package org.studyplatform.courseservice.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -77,6 +81,44 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, message);
     }
 
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleMethodValidation(
+            HandlerMethodValidationException exception,
+            HttpServletRequest request
+    ) {
+        String message = exception.getParameterValidationResults()
+                .stream()
+                .map(this::formatParameterValidationResult)
+                .collect(Collectors.joining("; "));
+
+        if (message.isBlank()) {
+            message = "Validation failed";
+        }
+
+        log.warn("Handled API method validation error status={} method={} path={} message={}",
+                HttpStatus.BAD_REQUEST.value(), request.getMethod(), pathWithQuery(request), message);
+        return build(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleConstraintViolation(
+            ConstraintViolationException exception,
+            HttpServletRequest request
+    ) {
+        String message = exception.getConstraintViolations()
+                .stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .collect(Collectors.joining("; "));
+
+        if (message.isBlank()) {
+            message = "Validation failed";
+        }
+
+        log.warn("Handled API constraint violation status={} method={} path={} message={}",
+                HttpStatus.BAD_REQUEST.value(), request.getMethod(), pathWithQuery(request), message);
+        return build(HttpStatus.BAD_REQUEST, message);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(
             HttpMessageNotReadableException exception,
@@ -106,6 +148,20 @@ public class GlobalExceptionHandler {
 
     private String formatFieldError(FieldError error) {
         return error.getField() + ": " + error.getDefaultMessage();
+    }
+
+    private String formatParameterValidationResult(ParameterValidationResult result) {
+        String parameterName = result.getMethodParameter().getParameterName();
+        if (parameterName == null || parameterName.isBlank()) {
+            parameterName = "parameter";
+        }
+
+        String errors = result.getResolvableErrors()
+                .stream()
+                .map(MessageSourceResolvable::getDefaultMessage)
+                .collect(Collectors.joining(", "));
+
+        return parameterName + ": " + errors;
     }
 
     private ResponseEntity<ApiErrorResponse> build(HttpStatus status, String message) {

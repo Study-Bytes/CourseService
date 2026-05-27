@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.studyplatform.courseservice.dto.internal.ExecutionPackageResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseAvailabilityResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseItemContentResponse;
+import org.studyplatform.courseservice.dto.internal.InternalCourseOwnershipResponse;
 import org.studyplatform.courseservice.dto.internal.InternalTestCaseResponse;
 import org.studyplatform.courseservice.dto.publicapi.ContentBlockResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemHintResponse;
@@ -163,6 +164,18 @@ public class CourseInternalService {
                 course.getAccessType(),
                 course.getEnrollmentEnabled(),
                 availableForEnrollment
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public InternalCourseOwnershipResponse getCourseOwnership(Long courseId, Long userId) {
+        Long createdByUserId = courseRepository.findCreatedByUserIdById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + courseId));
+
+        return new InternalCourseOwnershipResponse(
+                courseId,
+                userId,
+                createdByUserId.equals(userId)
         );
     }
 

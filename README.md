@@ -292,6 +292,14 @@ GET /api/v1/internal/courses/{courseId}/availability
 
 This endpoint returns publication/access/enrollment state for a course. `LearningService` can use it before creating enrollment records.
 
+### Course ownership
+
+```http
+GET /api/v1/internal/courses/{courseId}/ownership?userId={userId}
+```
+
+This endpoint lets `LearningService` check whether a user is the course author. It returns `courseId`, `userId` and `owner`.
+
 Public endpoints must continue to hide:
 
 - hidden tests;

@@ -6,6 +6,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.studyplatform.courseservice.dto.internal.ExecutionPackageResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseItemContentResponse;
+import org.studyplatform.courseservice.dto.internal.InternalCourseOwnershipResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemOptionResponse;
 import org.studyplatform.courseservice.dto.publicapi.OpenTestCaseResponse;
 import org.studyplatform.courseservice.entity.Course;
@@ -17,6 +18,7 @@ import org.studyplatform.courseservice.entity.CourseModule;
 import org.studyplatform.courseservice.entity.enums.CourseAccessType;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
 import org.studyplatform.courseservice.entity.enums.TestVisibility;
+import org.studyplatform.courseservice.exception.ResourceNotFoundException;
 import org.studyplatform.courseservice.repository.CourseItemContentBlockRepository;
 import org.studyplatform.courseservice.repository.CourseItemHintRepository;
 import org.studyplatform.courseservice.repository.CourseItemOptionRepository;
@@ -30,6 +32,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.codingItem;
 import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.course;
@@ -104,6 +107,36 @@ class CourseInternalServiceUnitTest {
 
         assertRecordDoesNotExpose(OpenTestCaseResponse.class, "expectedOutput", "visibility");
         assertRecordDoesNotExpose(CourseItemOptionResponse.class, "correct", "explanation");
+    }
+
+    @Test
+    void ownershipShouldCompareCourseAuthorWithUserId() {
+        CourseInternalService service = service();
+
+        when(courseRepository.findCreatedByUserIdById(10L)).thenReturn(Optional.of(5L));
+
+        InternalCourseOwnershipResponse ownerResponse = service.getCourseOwnership(10L, 5L);
+        InternalCourseOwnershipResponse nonOwnerResponse = service.getCourseOwnership(10L, 8L);
+
+        assertEquals(10L, ownerResponse.courseId());
+        assertEquals(5L, ownerResponse.userId());
+        assertEquals(true, ownerResponse.owner());
+        assertEquals(8L, nonOwnerResponse.userId());
+        assertEquals(false, nonOwnerResponse.owner());
+    }
+
+    @Test
+    void ownershipShouldReturnNotFoundWhenCourseDoesNotExist() {
+        CourseInternalService service = service();
+
+        when(courseRepository.findCreatedByUserIdById(10L)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class,
+                () -> service.getCourseOwnership(10L, 5L)
+        );
+
+        assertEquals("Course not found: 10", exception.getMessage());
     }
 
     private CourseInternalService service() {

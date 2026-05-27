@@ -87,6 +87,16 @@ class InternalCourseControllerIntegrationTest {
     }
 
     @Test
+    void shouldRejectCourseOwnershipWithoutApiKey() throws Exception {
+        Long courseId = seedCodingItem().courseId();
+
+        mockMvc.perform(get("/api/v1/internal/courses/{courseId}/ownership", courseId)
+                        .param("userId", "1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid or missing internal API key"));
+    }
+
+    @Test
     void shouldRejectInternalEndpointWithInvalidApiKey() throws Exception {
         Long itemId = seedCodingItem().itemId();
 
@@ -132,6 +142,48 @@ class InternalCourseControllerIntegrationTest {
     }
 
     @Test
+    void shouldReturnCourseOwnershipForOwnerAndNonOwner() throws Exception {
+        SeededCodingItem seededItem = seedCodingItem();
+        Long courseId = seededItem.courseId();
+
+        mockMvc.perform(get("/api/v1/internal/courses/{courseId}/ownership", courseId)
+                        .param("userId", "1")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courseId").value(courseId))
+                .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(jsonPath("$.owner").value(true));
+
+        mockMvc.perform(get("/api/v1/internal/courses/{courseId}/ownership", courseId)
+                        .param("userId", "8")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courseId").value(courseId))
+                .andExpect(jsonPath("$.userId").value(8))
+                .andExpect(jsonPath("$.owner").value(false));
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingCourseOwnership() throws Exception {
+        mockMvc.perform(get("/api/v1/internal/courses/{courseId}/ownership", 999999L)
+                        .param("userId", "1")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Course not found: 999999"));
+    }
+
+    @Test
+    void shouldRejectNonPositiveCourseOwnershipUserId() throws Exception {
+        Long courseId = seedCodingItem().courseId();
+
+        mockMvc.perform(get("/api/v1/internal/courses/{courseId}/ownership", courseId)
+                        .param("userId", "0")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("userId")));
+    }
+
+    @Test
     void shouldReturnStudentSafeContentForValidInternalApiKey() throws Exception {
         Long itemId = seedCodingItem().itemId();
 
@@ -154,6 +206,7 @@ class InternalCourseControllerIntegrationTest {
                 .andExpect(jsonPath("$.id").value(itemId))
                 .andExpect(jsonPath("$.title").value("Print square"))
                 .andExpect(jsonPath("$.itemType").value("CODING"))
+                .andExpect(content().string(not(containsString("createdByUserId"))))
                 .andExpect(content().string(not(containsString("contentBlocks"))))
                 .andExpect(content().string(not(containsString("starterCode"))))
                 .andExpect(content().string(not(containsString("openTests"))))

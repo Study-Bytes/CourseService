@@ -115,6 +115,7 @@ class PublicCourseControllerIntegrationTest {
                 .andExpect(jsonPath("$.modules[0].timeLimitMinutes").value(nullValue()))
                 .andExpect(jsonPath("$.modules[0].items", hasSize(2)))
                 .andExpect(jsonPath("$.modules[0].items[0].id").value(seeded.codingItemId()))
+                .andExpect(content().string(not(containsString("createdByUserId"))))
                 .andExpect(content().string(not(containsString("expectedOutput"))))
                 .andExpect(content().string(not(containsString("hidden-1"))))
                 .andExpect(content().string(not(containsString("Correct explanation"))));

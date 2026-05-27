@@ -46,6 +46,27 @@ Response includes:
 
 LearningService should apply its own enrollment rules on top of this response.
 
+## Course Ownership
+
+For teacher access to course-level views such as leaderboards, LearningService can check whether a user is the course author:
+
+```http
+GET /api/v1/internal/courses/{courseId}/ownership?userId={userId}
+X-Internal-Api-Key: <secret>
+```
+
+Response:
+
+```json
+{
+  "courseId": 10,
+  "userId": 5,
+  "owner": true
+}
+```
+
+This endpoint only compares `courses.created_by_user_id` with the requested `userId`. It does not expose ownership data through public APIs.
+
 ## Course Item Content
 
 After LearningService confirms that a student can access an item, it can request student-safe content:
