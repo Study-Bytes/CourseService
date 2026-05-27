@@ -465,6 +465,7 @@ public class CourseAdminService {
                 .trimTrailingWhitespaces(request.trimTrailingWhitespaces())
                 .build();
 
+        item.normalizeForItemType();
         validateItemForSave(item, List.of(), List.of(), List.of());
 
         CourseItem saved = itemRepository.save(item);
@@ -540,6 +541,7 @@ public class CourseAdminService {
             item.setTrimTrailingWhitespaces(request.trimTrailingWhitespaces());
         }
 
+        item.normalizeForItemType();
         validateItemForSave(
                 item,
                 contentBlockRepository.findByItemIdOrderByOrderIndexAsc(itemId),

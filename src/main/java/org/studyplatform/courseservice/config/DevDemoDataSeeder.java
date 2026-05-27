@@ -90,7 +90,7 @@ public class DevDemoDataSeeder implements CommandLineRunner {
                 .status(CourseStatus.PUBLISHED)
                 .accessType(CourseAccessType.PUBLIC)
                 .enrollmentEnabled(true)
-                .coverImageUrl("https://example.com/assets/courses/python-basics-demo-cover.png")
+                .coverImageUrl("https://images.unsplash.com/photo-1526379095098-d400fd0bf935?auto=format&fit=crop&w=1200&q=80")
                 .estimatedMinutes(60)
                 .createdByUserId(1L)
                 .publishedAt(Instant.now())

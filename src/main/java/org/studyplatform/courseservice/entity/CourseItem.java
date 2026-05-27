@@ -115,22 +115,7 @@ public class CourseItem {
             updatedAt = now;
         }
 
-        if (itemType == null) {
-            itemType = CourseItemType.CODING;
-        }
-
-
-        if (timeLimitMs == null) {
-            timeLimitMs = 1500;
-        }
-
-        if (memoryLimitMb == null) {
-            memoryLimitMb = 256;
-        }
-
-        if (outputLimitKb == null) {
-            outputLimitKb = 256;
-        }
+        normalizeForItemType();
 
         if (networkDisabled == null) {
             networkDisabled = true;
@@ -156,5 +141,37 @@ public class CourseItem {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+        normalizeForItemType();
+    }
+
+    public void normalizeForItemType() {
+        if (itemType == null) {
+            itemType = CourseItemType.CODING;
+        }
+
+        if (isExecutableItem()) {
+            if (timeLimitMs == null) {
+                timeLimitMs = 1500;
+            }
+
+            if (memoryLimitMb == null) {
+                memoryLimitMb = 256;
+            }
+
+            if (outputLimitKb == null) {
+                outputLimitKb = 256;
+            }
+            return;
+        }
+
+        starterCode = null;
+        language = null;
+        timeLimitMs = null;
+        memoryLimitMb = null;
+        outputLimitKb = null;
+    }
+
+    private boolean isExecutableItem() {
+        return itemType == CourseItemType.CODING || itemType == CourseItemType.SQL;
     }
 }

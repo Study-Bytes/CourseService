@@ -863,6 +863,55 @@ class AdminCourseControllerIntegrationTest {
     }
 
     @Test
+    void shouldUpdateTheoryItemWithoutExecutionFieldsAndPersistContentBlocks() throws Exception {
+        Long courseId = createCourse("theory-update-" + System.nanoTime());
+        Long moduleId = createModule(courseId, "Theory", 0);
+        Long itemId = createTheoryItem(moduleId, "Initial theory", 0, "Initial text.");
+
+        mockMvc.perform(put("/api/v1/admin/course-items/{itemId}", itemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Updated theory",
+                                  "itemType": "THEORY",
+                                  "statement": "Updated theory text.",
+                                  "orderIndex": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Updated theory"))
+                .andExpect(jsonPath("$.statement").value("Updated theory text."))
+                .andExpect(jsonPath("$.language").value(nullValue()))
+                .andExpect(jsonPath("$.timeLimitMs").value(nullValue()))
+                .andExpect(jsonPath("$.memoryLimitMb").value(nullValue()))
+                .andExpect(jsonPath("$.outputLimitKb").value(nullValue()));
+
+        mockMvc.perform(put("/api/v1/admin/course-items/{itemId}/content-blocks", itemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "contentBlocks": [
+                                    {
+                                      "blockType": "TEXT",
+                                      "orderIndex": 0,
+                                      "title": "Theory body",
+                                      "textContent": "Stored text block for the theory lesson."
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentBlocks", hasSize(1)))
+                .andExpect(jsonPath("$.contentBlocks[0].textContent").value("Stored text block for the theory lesson."));
+
+        mockMvc.perform(get("/api/v1/admin/course-items/{itemId}", itemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statement").value("Updated theory text."))
+                .andExpect(jsonPath("$.contentBlocks", hasSize(1)))
+                .andExpect(jsonPath("$.contentBlocks[0].title").value("Theory body"));
+    }
+
+    @Test
     void shouldRejectQuizOptionsForCodingItem() throws Exception {
         Long courseId = createCourse("coding-options-rejected-" + System.nanoTime());
         Long moduleId = createModule(courseId, "Practice", 0);

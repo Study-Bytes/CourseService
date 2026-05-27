@@ -31,7 +31,7 @@ class FlywayMigrationSmokeTest {
 
         MigrateResult result = flyway.migrate();
 
-        assertEquals(4, result.migrationsExecuted);
+        assertEquals(5, result.migrationsExecuted);
 
         try (Connection connection = dataSource.getConnection()) {
             assertTrue(tableExists(connection, "flyway_schema_history"));
