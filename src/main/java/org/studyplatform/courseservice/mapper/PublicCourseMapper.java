@@ -90,7 +90,9 @@ public class PublicCourseMapper {
                 module.getTitle(),
                 module.getDescription(),
                 module.getOrderIndex(),
+                module.getDeadlineType(),
                 module.getDeadlineAt(),
+                module.getTimeLimitMinutes(),
                 itemResponses
         );
     }

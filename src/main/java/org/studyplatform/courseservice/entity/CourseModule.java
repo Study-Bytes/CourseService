@@ -2,6 +2,8 @@ package org.studyplatform.courseservice.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,6 +20,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.studyplatform.courseservice.entity.enums.ModuleDeadlineType;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -59,8 +62,16 @@ public class CourseModule {
     @Column(name = "order_index", nullable = false)
     private Integer orderIndex;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "deadline_type", nullable = false, length = 32)
+    private ModuleDeadlineType deadlineType = ModuleDeadlineType.NONE;
+
     @Column(name = "deadline_at")
     private LocalDateTime deadlineAt;
+
+    @Column(name = "time_limit_minutes")
+    private Integer timeLimitMinutes;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -70,6 +81,8 @@ public class CourseModule {
 
     @PrePersist
     protected void onCreate() {
+        normalizeDeadlineType();
+
         Instant now = Instant.now();
 
         if (createdAt == null) {
@@ -83,6 +96,23 @@ public class CourseModule {
 
     @PreUpdate
     protected void onUpdate() {
+        normalizeDeadlineType();
         updatedAt = Instant.now();
+    }
+
+    private void normalizeDeadlineType() {
+        if (deadlineAt != null && (deadlineType == null || deadlineType == ModuleDeadlineType.NONE)) {
+            deadlineType = ModuleDeadlineType.ABSOLUTE;
+            return;
+        }
+
+        if (timeLimitMinutes != null && (deadlineType == null || deadlineType == ModuleDeadlineType.NONE)) {
+            deadlineType = ModuleDeadlineType.RELATIVE_FROM_START;
+            return;
+        }
+
+        if (deadlineType == null) {
+            deadlineType = ModuleDeadlineType.NONE;
+        }
     }
 }

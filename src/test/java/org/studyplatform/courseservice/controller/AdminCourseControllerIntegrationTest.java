@@ -26,6 +26,7 @@ import org.studyplatform.courseservice.entity.enums.CourseDifficulty;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
 import org.studyplatform.courseservice.entity.enums.CourseItemType;
 import org.studyplatform.courseservice.entity.enums.ComparisonMode;
+import org.studyplatform.courseservice.entity.enums.ModuleDeadlineType;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -225,15 +226,19 @@ class AdminCourseControllerIntegrationTest {
                         .content(createRequest))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.courseId").value(courseId))
+                .andExpect(jsonPath("$.deadlineType").value("ABSOLUTE"))
                 .andExpect(jsonPath("$.deadlineAt").value("2026-06-01T23:59:00"))
+                .andExpect(jsonPath("$.timeLimitMinutes").value(nullValue()))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
         Long moduleId = extractLong(createResponse, "id");
+        CourseModule createdModule = moduleRepository.findById(moduleId).orElseThrow();
+        assertEquals(ModuleDeadlineType.ABSOLUTE, createdModule.getDeadlineType());
         assertEquals(
                 LocalDateTime.parse("2026-06-01T23:59:00"),
-                moduleRepository.findById(moduleId).orElseThrow().getDeadlineAt()
+                createdModule.getDeadlineAt()
         );
 
         String titleOnlyUpdateRequest = """
@@ -247,11 +252,12 @@ class AdminCourseControllerIntegrationTest {
                         .content(titleOnlyUpdateRequest))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("SQL basics updated"))
+                .andExpect(jsonPath("$.deadlineType").value("ABSOLUTE"))
                 .andExpect(jsonPath("$.deadlineAt").value("2026-06-01T23:59:00"));
 
         String updateRequest = """
                 {
-                  "deadlineAt": "2026-06-05T12:30:00"
+                  "deadlineAt": "2026-06-05"
                 }
                 """;
 
@@ -259,13 +265,30 @@ class AdminCourseControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequest))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.deadlineAt").value("2026-06-05T12:30:00"));
+                .andExpect(jsonPath("$.deadlineType").value("ABSOLUTE"))
+                .andExpect(jsonPath("$.deadlineAt").value("2026-06-05T23:59:00"));
 
         mockMvc.perform(get("/api/v1/admin/courses/{courseId}", courseId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.modules[0].deadlineAt").value("2026-06-05T12:30:00"));
+                .andExpect(jsonPath("$.modules[0].deadlineType").value("ABSOLUTE"))
+                .andExpect(jsonPath("$.modules[0].deadlineAt").value("2026-06-05T23:59:00"));
 
-        String clearRequest = """
+        String relativeRequest = """
+                {
+                  "deadlineType": "RELATIVE_FROM_START",
+                  "timeLimitMinutes": 180
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/modules/{moduleId}", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(relativeRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deadlineType").value("RELATIVE_FROM_START"))
+                .andExpect(jsonPath("$.deadlineAt").value(nullValue()))
+                .andExpect(jsonPath("$.timeLimitMinutes").value(180));
+
+        String legacyClearRequest = """
                 {
                   "deadlineAt": null
                 }
@@ -273,11 +296,125 @@ class AdminCourseControllerIntegrationTest {
 
         mockMvc.perform(put("/api/v1/admin/modules/{moduleId}", moduleId)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .content(legacyClearRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deadlineType").value("NONE"))
+                .andExpect(jsonPath("$.deadlineAt").value(nullValue()))
+                .andExpect(jsonPath("$.timeLimitMinutes").value(nullValue()));
+
+        String relativeByTimeLimitRequest = """
+                {
+                  "timeLimitMinutes": 90
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/modules/{moduleId}", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(relativeByTimeLimitRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deadlineType").value("RELATIVE_FROM_START"))
+                .andExpect(jsonPath("$.deadlineAt").value(nullValue()))
+                .andExpect(jsonPath("$.timeLimitMinutes").value(90));
+
+        String clearRequest = """
+                {
+                  "deadlineType": "NONE"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/admin/modules/{moduleId}", moduleId)
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(clearRequest))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.deadlineAt").value(nullValue()));
+                .andExpect(jsonPath("$.deadlineType").value("NONE"))
+                .andExpect(jsonPath("$.deadlineAt").value(nullValue()))
+                .andExpect(jsonPath("$.timeLimitMinutes").value(nullValue()));
 
-        assertNull(moduleRepository.findById(moduleId).orElseThrow().getDeadlineAt());
+        CourseModule clearedModule = moduleRepository.findById(moduleId).orElseThrow();
+        assertEquals(ModuleDeadlineType.NONE, clearedModule.getDeadlineType());
+        assertNull(clearedModule.getDeadlineAt());
+        assertNull(clearedModule.getTimeLimitMinutes());
+    }
+
+    @Test
+    void shouldRejectInvalidModuleDeadlineFormat() throws Exception {
+        Long courseId = createCourse("module-deadline-invalid-" + System.nanoTime());
+
+        String request = """
+                {
+                  "title": "Invalid deadline",
+                  "description": "Module with invalid deadline.",
+                  "orderIndex": 0,
+                  "deadlineAt": "tomorrow"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("deadlineAt must be ISO local date-time or date")));
+    }
+
+    @Test
+    void shouldRejectInconsistentModuleDeadlineFields() throws Exception {
+        Long courseId = createCourse("module-deadline-inconsistent-" + System.nanoTime());
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid relative deadline",
+                                  "description": "Module with invalid deadline.",
+                                  "orderIndex": 0,
+                                  "deadlineType": "RELATIVE_FROM_START",
+                                  "deadlineAt": "2026-06-01T23:59:00"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("deadlineAt must be null for RELATIVE_FROM_START")));
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid absolute deadline",
+                                  "description": "Module with invalid deadline.",
+                                  "orderIndex": 0,
+                                  "deadlineType": "ABSOLUTE",
+                                  "timeLimitMinutes": 60
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("deadlineAt is required for ABSOLUTE")));
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Invalid none deadline",
+                                  "description": "Module with invalid deadline.",
+                                  "orderIndex": 0,
+                                  "deadlineType": "NONE",
+                                  "deadlineAt": "2026-06-01T23:59:00"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("deadlineAt must be null for NONE")));
+
+        mockMvc.perform(post("/api/v1/admin/courses/{courseId}/modules", courseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Ambiguous deadline",
+                                  "description": "Module with invalid deadline.",
+                                  "orderIndex": 0,
+                                  "deadlineAt": "2026-06-01T23:59:00",
+                                  "timeLimitMinutes": 60
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("deadlineAt and timeLimitMinutes cannot be set together")));
     }
 
     @Test
@@ -1296,7 +1433,9 @@ class AdminCourseControllerIntegrationTest {
                 .content(request))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.courseId").value(courseId))
+                .andExpect(jsonPath("$.deadlineType").value("NONE"))
                 .andExpect(jsonPath("$.deadlineAt").value(nullValue()))
+                .andExpect(jsonPath("$.timeLimitMinutes").value(nullValue()))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

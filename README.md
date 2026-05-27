@@ -151,18 +151,41 @@ PUT    /api/v1/admin/modules/{moduleId}
 DELETE /api/v1/admin/modules/{moduleId}
 ```
 
-Modules can optionally store `deadlineAt`. Admin create/update payloads accept it in local timestamp format:
+Modules can optionally store deadline settings. Supported `deadlineType` values:
+
+```text
+NONE
+ABSOLUTE
+RELATIVE_FROM_START
+```
+
+For an absolute deadline, admin create/update payloads accept `deadlineAt` in local timestamp format:
 
 ```json
 {
   "title": "SQL basics",
   "description": "Practice module.",
   "orderIndex": 0,
+  "deadlineType": "ABSOLUTE",
   "deadlineAt": "2026-06-01T23:59:00"
 }
 ```
 
-If a module has no deadline, CourseService returns `"deadlineAt": null`. Public course details expose this field so BFF/Site can call LearningService module deadline-state checks for enrolled users.
+For a relative timer from module start, use `timeLimitMinutes`:
+
+```json
+{
+  "title": "SQL basics",
+  "description": "Practice module.",
+  "orderIndex": 0,
+  "deadlineType": "RELATIVE_FROM_START",
+  "timeLimitMinutes": 180
+}
+```
+
+If a module has no deadline, CourseService returns `"deadlineType": "NONE"`, `"deadlineAt": null` and `"timeLimitMinutes": null`. Public course details expose these fields so BFF/Site can render module deadline state for enrolled users.
+
+For date-picker UIs, CourseService also accepts a date-only value such as `"2026-06-01"` and stores it as `"2026-06-01T23:59:00"`.
 
 Module reorder request:
 

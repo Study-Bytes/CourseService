@@ -4,8 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-
-import java.time.LocalDateTime;
+import org.studyplatform.courseservice.entity.enums.ModuleDeadlineType;
 
 public record CreateModuleRequest(
         @NotBlank
@@ -18,6 +17,11 @@ public record CreateModuleRequest(
         @Min(0)
         Integer orderIndex,
 
-        LocalDateTime deadlineAt
+        ModuleDeadlineType deadlineType,
+
+        String deadlineAt,
+
+        @Min(1)
+        Integer timeLimitMinutes
 ) {
 }

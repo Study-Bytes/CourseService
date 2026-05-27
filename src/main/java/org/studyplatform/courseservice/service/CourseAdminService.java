@@ -41,6 +41,7 @@ import org.studyplatform.courseservice.entity.enums.CourseAccessType;
 import org.studyplatform.courseservice.entity.enums.CourseDifficulty;
 import org.studyplatform.courseservice.entity.enums.CourseItemType;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
+import org.studyplatform.courseservice.entity.enums.ModuleDeadlineType;
 import org.studyplatform.courseservice.entity.enums.TestVisibility;
 import org.studyplatform.courseservice.exception.BadRequestException;
 import org.studyplatform.courseservice.exception.ConflictException;
@@ -56,6 +57,12 @@ import org.studyplatform.courseservice.repository.CourseRepository;
 import org.studyplatform.courseservice.security.CurrentUserService;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -72,6 +79,7 @@ import java.util.stream.Collectors;
 public class CourseAdminService {
 
     private static final int MAX_ADMIN_PAGE_SIZE = 100;
+    private static final LocalTime DATE_ONLY_DEADLINE_TIME = LocalTime.of(23, 59);
 
     private final CourseRepository courseRepository;
     private final CourseModuleRepository moduleRepository;
@@ -321,13 +329,20 @@ public class CourseAdminService {
     public AdminModuleResponse createModule(Long courseId, CreateModuleRequest request) {
         Course course = getCourseOrThrow(courseId);
         assertOrderIndexAvailableForModule(courseId, request.orderIndex(), null);
+        ModuleDeadline deadline = resolveCreateModuleDeadline(
+                request.deadlineType(),
+                request.deadlineAt(),
+                request.timeLimitMinutes()
+        );
 
         CourseModule module = CourseModule.builder()
                 .course(course)
                 .title(request.title().trim())
                 .description(blankToNull(request.description()))
                 .orderIndex(request.orderIndex())
-                .deadlineAt(request.deadlineAt())
+                .deadlineType(deadline.deadlineType())
+                .deadlineAt(deadline.deadlineAt())
+                .timeLimitMinutes(deadline.timeLimitMinutes())
                 .build();
 
         CourseModule saved = moduleRepository.save(module);
@@ -375,8 +390,11 @@ public class CourseAdminService {
             module.setOrderIndex(request.orderIndex());
         }
 
-        if (request.deadlineAtProvided()) {
-            module.setDeadlineAt(request.deadlineAt());
+        if (request.hasDeadlineChanges()) {
+            ModuleDeadline deadline = resolveUpdateModuleDeadline(module, request);
+            module.setDeadlineType(deadline.deadlineType());
+            module.setDeadlineAt(deadline.deadlineAt());
+            module.setTimeLimitMinutes(deadline.timeLimitMinutes());
         }
 
         CourseModule saved = moduleRepository.save(module);
@@ -1114,7 +1132,200 @@ public class CourseAdminService {
         return hasText(value) ? value.trim() : null;
     }
 
+    private ModuleDeadline resolveCreateModuleDeadline(
+            ModuleDeadlineType requestedType,
+            String rawDeadlineAt,
+            Integer timeLimitMinutes
+    ) {
+        ModuleDeadlineType deadlineType = requestedType;
+
+        if (deadlineType == null) {
+            if (hasText(rawDeadlineAt) && timeLimitMinutes != null) {
+                throw new BadRequestException("deadlineAt and timeLimitMinutes cannot be set together");
+            } else if (hasText(rawDeadlineAt)) {
+                deadlineType = ModuleDeadlineType.ABSOLUTE;
+            } else if (timeLimitMinutes != null) {
+                deadlineType = ModuleDeadlineType.RELATIVE_FROM_START;
+            } else {
+                deadlineType = ModuleDeadlineType.NONE;
+            }
+        }
+
+        return normalizeModuleDeadline(deadlineType, rawDeadlineAt, timeLimitMinutes);
+    }
+
+    private ModuleDeadline resolveUpdateModuleDeadline(CourseModule module, UpdateModuleRequest request) {
+        ModuleDeadlineType currentType = valueOrDefault(module.getDeadlineType(), ModuleDeadlineType.NONE);
+
+        if (request.deadlineTypeProvided()) {
+            ModuleDeadlineType deadlineType = valueOrDefault(request.deadlineType(), ModuleDeadlineType.NONE);
+
+            String rawDeadlineAt = request.deadlineAtProvided()
+                    ? request.deadlineAt()
+                    : currentDeadlineAtForUpdate(module, currentType, deadlineType);
+
+            Integer timeLimitMinutes = request.timeLimitMinutesProvided()
+                    ? request.timeLimitMinutes()
+                    : currentTimeLimitForUpdate(module, currentType, deadlineType);
+
+            return normalizeModuleDeadline(deadlineType, rawDeadlineAt, timeLimitMinutes);
+        }
+
+        return resolvePartialModuleDeadlineUpdate(request);
+    }
+
+    private String currentDeadlineAtForUpdate(
+            CourseModule module,
+            ModuleDeadlineType currentType,
+            ModuleDeadlineType deadlineType
+    ) {
+        if (deadlineType == ModuleDeadlineType.ABSOLUTE && currentType == ModuleDeadlineType.ABSOLUTE) {
+            return module.getDeadlineAt() == null ? null : module.getDeadlineAt().toString();
+        }
+
+        return null;
+    }
+
+    private Integer currentTimeLimitForUpdate(
+            CourseModule module,
+            ModuleDeadlineType currentType,
+            ModuleDeadlineType deadlineType
+    ) {
+        if (deadlineType == ModuleDeadlineType.RELATIVE_FROM_START
+                && currentType == ModuleDeadlineType.RELATIVE_FROM_START) {
+            return module.getTimeLimitMinutes();
+        }
+
+        return null;
+    }
+
+    private ModuleDeadline resolvePartialModuleDeadlineUpdate(UpdateModuleRequest request) {
+        String rawDeadlineAt = request.deadlineAt();
+        Integer timeLimitMinutes = request.timeLimitMinutes();
+
+        if (request.deadlineAtProvided() && request.timeLimitMinutesProvided()) {
+            if (hasText(rawDeadlineAt) && timeLimitMinutes != null) {
+                throw new BadRequestException("deadlineAt and timeLimitMinutes cannot be set together");
+            }
+
+            if (hasText(rawDeadlineAt)) {
+                return normalizeModuleDeadline(ModuleDeadlineType.ABSOLUTE, rawDeadlineAt, null);
+            }
+
+            if (timeLimitMinutes != null) {
+                return normalizeModuleDeadline(ModuleDeadlineType.RELATIVE_FROM_START, null, timeLimitMinutes);
+            }
+
+            return normalizeModuleDeadline(ModuleDeadlineType.NONE, null, null);
+        }
+
+        if (request.deadlineAtProvided()) {
+            if (hasText(rawDeadlineAt)) {
+                return normalizeModuleDeadline(ModuleDeadlineType.ABSOLUTE, rawDeadlineAt, null);
+            }
+
+            return normalizeModuleDeadline(ModuleDeadlineType.NONE, null, null);
+        }
+
+        if (request.timeLimitMinutesProvided()) {
+            if (timeLimitMinutes != null) {
+                return normalizeModuleDeadline(ModuleDeadlineType.RELATIVE_FROM_START, null, timeLimitMinutes);
+            }
+
+            return normalizeModuleDeadline(ModuleDeadlineType.NONE, null, null);
+        }
+
+        return normalizeModuleDeadline(ModuleDeadlineType.NONE, null, null);
+    }
+
+    private ModuleDeadline normalizeModuleDeadline(
+            ModuleDeadlineType deadlineType,
+            String rawDeadlineAt,
+            Integer timeLimitMinutes
+    ) {
+        if (deadlineType == null || deadlineType == ModuleDeadlineType.NONE) {
+            if (hasText(rawDeadlineAt)) {
+                throw new BadRequestException("deadlineAt must be null for NONE module deadline");
+            }
+
+            if (timeLimitMinutes != null) {
+                throw new BadRequestException("timeLimitMinutes must be null for NONE module deadline");
+            }
+
+            return new ModuleDeadline(ModuleDeadlineType.NONE, null, null);
+        }
+
+        if (deadlineType == ModuleDeadlineType.ABSOLUTE) {
+            LocalDateTime deadlineAt = parseModuleDeadlineAt(rawDeadlineAt);
+
+            if (deadlineAt == null) {
+                throw new BadRequestException("deadlineAt is required for ABSOLUTE module deadline");
+            }
+
+            if (timeLimitMinutes != null) {
+                throw new BadRequestException("timeLimitMinutes must be null for ABSOLUTE module deadline");
+            }
+
+            return new ModuleDeadline(ModuleDeadlineType.ABSOLUTE, deadlineAt, null);
+        }
+
+        if (deadlineType == ModuleDeadlineType.RELATIVE_FROM_START) {
+            if (hasText(rawDeadlineAt)) {
+                throw new BadRequestException("deadlineAt must be null for RELATIVE_FROM_START module deadline");
+            }
+
+            if (timeLimitMinutes == null) {
+                throw new BadRequestException("timeLimitMinutes is required for RELATIVE_FROM_START module deadline");
+            }
+
+            if (timeLimitMinutes < 1) {
+                throw new BadRequestException("timeLimitMinutes must be greater than or equal to 1");
+            }
+
+            return new ModuleDeadline(ModuleDeadlineType.RELATIVE_FROM_START, null, timeLimitMinutes);
+        }
+
+        throw new BadRequestException("Unsupported module deadlineType: " + deadlineType);
+    }
+
+    private LocalDateTime parseModuleDeadlineAt(String rawValue) {
+        if (!hasText(rawValue)) {
+            return null;
+        }
+
+        String value = rawValue.trim();
+
+        try {
+            return LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        } catch (DateTimeParseException ignored) {
+            // Try date-only and offset formats below.
+        }
+
+        try {
+            return LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE)
+                    .atTime(DATE_ONLY_DEADLINE_TIME);
+        } catch (DateTimeParseException ignored) {
+            // Try offset date-time below.
+        }
+
+        try {
+            return OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    .toLocalDateTime();
+        } catch (DateTimeParseException exception) {
+            throw new BadRequestException(
+                    "deadlineAt must be ISO local date-time or date, for example 2026-06-01T23:59:00 or 2026-06-01"
+            );
+        }
+    }
+
     private <T> T valueOrDefault(T value, T defaultValue) {
         return value != null ? value : defaultValue;
+    }
+
+    private record ModuleDeadline(
+            ModuleDeadlineType deadlineType,
+            LocalDateTime deadlineAt,
+            Integer timeLimitMinutes
+    ) {
     }
 }

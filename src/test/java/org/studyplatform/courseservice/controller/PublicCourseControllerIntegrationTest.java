@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -109,7 +110,9 @@ class PublicCourseControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(seeded.courseId()))
                 .andExpect(jsonPath("$.modules", hasSize(1)))
+                .andExpect(jsonPath("$.modules[0].deadlineType").value("ABSOLUTE"))
                 .andExpect(jsonPath("$.modules[0].deadlineAt").value("2026-06-01T23:59:00"))
+                .andExpect(jsonPath("$.modules[0].timeLimitMinutes").value(nullValue()))
                 .andExpect(jsonPath("$.modules[0].items", hasSize(2)))
                 .andExpect(jsonPath("$.modules[0].items[0].id").value(seeded.codingItemId()))
                 .andExpect(content().string(not(containsString("expectedOutput"))))

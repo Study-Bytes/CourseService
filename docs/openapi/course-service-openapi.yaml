@@ -949,9 +949,19 @@ components:
           type: integer
           format: int32
           writeOnly: true
+        deadlineType:
+          type: string
+          enum:
+          - NONE
+          - ABSOLUTE
+          - RELATIVE_FROM_START
+          writeOnly: true
         deadlineAt:
           type: string
-          format: date-time
+          writeOnly: true
+        timeLimitMinutes:
+          type: integer
+          format: int32
           writeOnly: true
     AdminContentBlockResponse:
       type: object
@@ -1079,9 +1089,18 @@ components:
         orderIndex:
           type: integer
           format: int32
+        deadlineType:
+          type: string
+          enum:
+          - NONE
+          - ABSOLUTE
+          - RELATIVE_FROM_START
         deadlineAt:
           type: string
           format: date-time
+        timeLimitMinutes:
+          type: integer
+          format: int32
         createdAt:
           type: string
           format: date-time
@@ -1561,9 +1580,18 @@ components:
           type: integer
           format: int32
           minimum: 0
+        deadlineType:
+          type: string
+          enum:
+          - NONE
+          - ABSOLUTE
+          - RELATIVE_FROM_START
         deadlineAt:
           type: string
-          format: date-time
+        timeLimitMinutes:
+          type: integer
+          format: int32
+          minimum: 1
       required:
       - orderIndex
       - title
@@ -1957,9 +1985,18 @@ components:
         orderIndex:
           type: integer
           format: int32
+        deadlineType:
+          type: string
+          enum:
+          - NONE
+          - ABSOLUTE
+          - RELATIVE_FROM_START
         deadlineAt:
           type: string
           format: date-time
+        timeLimitMinutes:
+          type: integer
+          format: int32
         items:
           type: array
           items:
