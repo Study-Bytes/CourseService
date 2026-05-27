@@ -666,6 +666,45 @@ paths:
                 type: object
                 additionalProperties:
                   type: string
+  /api/v1/internal/courses/{courseId}/ownership:
+    get:
+      tags:
+      - Internal Course API
+      summary: Check course ownership
+      description: Returns whether the given user is the author of the course.
+      operationId: getCourseOwnership
+      parameters:
+      - name: courseId
+        in: path
+        description: Course id
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 10
+      - name: userId
+        in: query
+        description: User id
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 5
+      responses:
+        "200":
+          description: Course ownership state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalCourseOwnershipResponse"
+        "401":
+          description: Missing or invalid internal API key
+        "404":
+          description: Course not found
+      security:
+      - internalApiKey: []
   /api/v1/internal/courses/{courseId}/availability:
     get:
       tags:
@@ -1595,6 +1634,24 @@ components:
       required:
       - orderIndex
       - title
+    InternalCourseOwnershipResponse:
+      type: object
+      properties:
+        courseId:
+          type: integer
+          format: int64
+          example: 10
+        userId:
+          type: integer
+          format: int64
+          example: 5
+        owner:
+          type: boolean
+          example: true
+      required:
+      - courseId
+      - owner
+      - userId
     InternalCourseAvailabilityResponse:
       type: object
       properties:
