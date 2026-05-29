@@ -781,6 +781,39 @@ paths:
                 $ref: "#/components/schemas/ExecutionPackageResponse"
       security:
       - internalApiKey: []
+  /api/v1/internal/course-items/{itemId}/quiz-evaluation-package:
+    get:
+      tags:
+      - Internal Course API
+      summary: Get quiz evaluation package
+      description: "Returns quiz options with correct flags for trusted LearningService\
+        \ evaluation. Intended only for trusted backend services."
+      operationId: getQuizEvaluationPackage
+      parameters:
+      - name: itemId
+        in: path
+        description: Course item id
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 8
+      responses:
+        "200":
+          description: Quiz evaluation package returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizEvaluationPackageResponse"
+        "400":
+          description: Course item is not a quiz
+        "401":
+          description: Missing or invalid internal API key
+        "404":
+          description: Course item not found
+      security:
+      - internalApiKey: []
   /api/v1/internal/course-items/{itemId}/content:
     get:
       tags:
@@ -1759,6 +1792,49 @@ components:
         orderIndex:
           type: integer
           format: int32
+    QuizEvaluationPackageResponse:
+      type: object
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        moduleId:
+          type: integer
+          format: int64
+        courseId:
+          type: integer
+          format: int64
+        itemType:
+          type: string
+          enum:
+          - CODING
+          - SQL
+          - QUIZ
+          - THEORY
+          - FILE
+        title:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizEvaluationOptionResponse"
+    QuizEvaluationOptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderIndex:
+          type: integer
+          format: int32
+        label:
+          type: string
+        text:
+          type: string
+        correct:
+          type: boolean
+        explanation:
+          type: string
     ContentBlockResponse:
       type: object
       properties:

@@ -9,6 +9,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.studyplatform.courseservice.entity.Course;
 import org.studyplatform.courseservice.entity.CourseItem;
+import org.studyplatform.courseservice.entity.CourseItemOption;
 import org.studyplatform.courseservice.entity.CourseItemTestCase;
 import org.studyplatform.courseservice.entity.CourseModule;
 import org.studyplatform.courseservice.entity.enums.ComparisonMode;
@@ -87,6 +88,15 @@ class InternalCourseControllerIntegrationTest {
     }
 
     @Test
+    void shouldRejectQuizEvaluationPackageWithoutApiKey() throws Exception {
+        Long itemId = seedQuizItem().itemId();
+
+        mockMvc.perform(get("/api/v1/internal/course-items/{itemId}/quiz-evaluation-package", itemId))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid or missing internal API key"));
+    }
+
+    @Test
     void shouldRejectCourseOwnershipWithoutApiKey() throws Exception {
         Long courseId = seedCodingItem().courseId();
 
@@ -124,6 +134,47 @@ class InternalCourseControllerIntegrationTest {
                 .andExpect(jsonPath("$.tests[0].expectedOutput").value("9\n"))
                 .andExpect(jsonPath("$.tests[1].visibility").value("HIDDEN"))
                 .andExpect(jsonPath("$.tests[1].expectedOutput").value("25\n"));
+    }
+
+    @Test
+    void shouldReturnQuizEvaluationPackageWithCorrectOptionsForValidInternalApiKey() throws Exception {
+        SeededQuizItem seededItem = seedQuizItem();
+
+        mockMvc.perform(get("/api/v1/internal/course-items/{itemId}/quiz-evaluation-package", seededItem.itemId())
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemId").value(seededItem.itemId()))
+                .andExpect(jsonPath("$.moduleId").value(seededItem.moduleId()))
+                .andExpect(jsonPath("$.courseId").value(seededItem.courseId()))
+                .andExpect(jsonPath("$.itemType").value("QUIZ"))
+                .andExpect(jsonPath("$.title").value("Syntax quiz"))
+                .andExpect(jsonPath("$.options", hasSize(2)))
+                .andExpect(jsonPath("$.options[0].id").value(seededItem.correctOptionId()))
+                .andExpect(jsonPath("$.options[0].orderIndex").value(0))
+                .andExpect(jsonPath("$.options[0].label").value("A"))
+                .andExpect(jsonPath("$.options[0].text").value("x = 1"))
+                .andExpect(jsonPath("$.options[0].correct").value(true))
+                .andExpect(jsonPath("$.options[0].explanation").value("Assignment uses one equals sign."))
+                .andExpect(jsonPath("$.options[1].id").value(seededItem.incorrectOptionId()))
+                .andExpect(jsonPath("$.options[1].correct").value(false));
+    }
+
+    @Test
+    void shouldRejectQuizEvaluationPackageForNonQuizItem() throws Exception {
+        Long itemId = seedCodingItem().itemId();
+
+        mockMvc.perform(get("/api/v1/internal/course-items/{itemId}/quiz-evaluation-package", itemId)
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("not a QUIZ")));
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingQuizEvaluationPackageItem() throws Exception {
+        mockMvc.perform(get("/api/v1/internal/course-items/{itemId}/quiz-evaluation-package", 999999L)
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Course item not found: 999999"));
     }
 
     @Test
@@ -195,6 +246,22 @@ class InternalCourseControllerIntegrationTest {
                 .andExpect(content().string(not(containsString("expectedOutput"))))
                 .andExpect(content().string(not(containsString("HIDDEN"))))
                 .andExpect(content().string(not(containsString("correct"))));
+    }
+
+    @Test
+    void shouldKeepInternalQuizContentLearnerSafe() throws Exception {
+        Long itemId = seedQuizItem().itemId();
+
+        mockMvc.perform(get("/api/v1/internal/course-items/{itemId}/content", itemId)
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemId").value(itemId))
+                .andExpect(jsonPath("$.itemType").value("QUIZ"))
+                .andExpect(jsonPath("$.options", hasSize(2)))
+                .andExpect(jsonPath("$.options[0].text").value("x = 1"))
+                .andExpect(content().string(not(containsString("correct"))))
+                .andExpect(content().string(not(containsString("explanation"))))
+                .andExpect(content().string(not(containsString("Assignment uses one equals sign."))));
     }
 
     @Test
@@ -275,6 +342,77 @@ class InternalCourseControllerIntegrationTest {
         return new SeededCodingItem(course.getId(), item.getId());
     }
 
+    private SeededQuizItem seedQuizItem() {
+        Course course = courseRepository.save(Course.builder()
+                .slug("internal-quiz-test-" + System.nanoTime())
+                .title("Internal Quiz Test Course")
+                .shortDescription("Course for internal quiz API tests.")
+                .description("Checks quiz evaluation package contract.")
+                .difficulty(CourseDifficulty.BEGINNER)
+                .status(CourseStatus.PUBLISHED)
+                .accessType(CourseAccessType.PUBLIC)
+                .enrollmentEnabled(true)
+                .estimatedMinutes(30)
+                .createdByUserId(1L)
+                .publishedAt(Instant.now())
+                .build());
+
+        CourseModule module = moduleRepository.save(CourseModule.builder()
+                .course(course)
+                .title("Quiz")
+                .description("Quiz module.")
+                .orderIndex(1)
+                .build());
+
+        CourseItem item = itemRepository.save(CourseItem.builder()
+                .module(module)
+                .title("Syntax quiz")
+                .itemType(CourseItemType.QUIZ)
+                .statement("Choose valid assignment syntax.")
+                .orderIndex(1)
+                .networkDisabled(true)
+                .readOnlyFs(true)
+                .comparisonMode(ComparisonMode.EXACT)
+                .normalizeLineEndings(true)
+                .trimTrailingWhitespaces(true)
+                .build());
+
+        CourseItemOption correctOption = optionRepository.save(CourseItemOption.builder()
+                .item(item)
+                .orderIndex(0)
+                .label("A")
+                .text("x = 1")
+                .correct(true)
+                .explanation("Assignment uses one equals sign.")
+                .build());
+
+        CourseItemOption incorrectOption = optionRepository.save(CourseItemOption.builder()
+                .item(item)
+                .orderIndex(1)
+                .label("B")
+                .text("int x = 1")
+                .correct(false)
+                .explanation("Python does not require a type here.")
+                .build());
+
+        return new SeededQuizItem(
+                course.getId(),
+                module.getId(),
+                item.getId(),
+                correctOption.getId(),
+                incorrectOption.getId()
+        );
+    }
+
     private record SeededCodingItem(Long courseId, Long itemId) {
+    }
+
+    private record SeededQuizItem(
+            Long courseId,
+            Long moduleId,
+            Long itemId,
+            Long correctOptionId,
+            Long incorrectOptionId
+    ) {
     }
 }
