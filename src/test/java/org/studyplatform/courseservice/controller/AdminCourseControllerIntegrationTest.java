@@ -1150,6 +1150,22 @@ class AdminCourseControllerIntegrationTest {
     }
 
     @Test
+    void shouldDeleteQuizItemWithOptions() throws Exception {
+        Long courseId = createCourse("delete-quiz-item-" + System.nanoTime());
+        Long moduleId = createModule(courseId, "Quiz", 0);
+        Long quizItemId = createQuizItem(moduleId, "Quiz", 0);
+        replaceOptions(quizItemId);
+
+        mockMvc.perform(delete("/api/v1/admin/course-items/{itemId}", quizItemId))
+                .andExpect(status().isNoContent());
+
+        assertEquals(0, optionRepository.findByItemIdOrderByOrderIndexAsc(quizItemId).size());
+
+        mockMvc.perform(get("/api/v1/admin/course-items/{itemId}", quizItemId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void shouldRejectInvalidItemTypeChildCollections() throws Exception {
         Long courseId = createCourse("invalid-child-collections-" + System.nanoTime());
         Long moduleId = createModule(courseId, "Mixed", 0);
