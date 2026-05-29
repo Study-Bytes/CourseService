@@ -1,6 +1,9 @@
 package org.studyplatform.courseservice.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.studyplatform.courseservice.entity.CourseItemTestCase;
 import org.studyplatform.courseservice.entity.enums.TestVisibility;
 
@@ -14,4 +17,8 @@ public interface CourseItemTestCaseRepository extends JpaRepository<CourseItemTe
             Long itemId,
             TestVisibility visibility
     );
+
+    @Modifying
+    @Query("delete from CourseItemTestCase testCase where testCase.item.id = :itemId")
+    void deleteByItemId(@Param("itemId") Long itemId);
 }

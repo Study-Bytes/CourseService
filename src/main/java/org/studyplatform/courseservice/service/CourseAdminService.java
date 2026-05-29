@@ -759,10 +759,10 @@ public class CourseAdminService {
     }
 
     private void deleteItemChildren(Long itemId) {
-        contentBlockRepository.deleteAllInBatch(contentBlockRepository.findByItemIdOrderByOrderIndexAsc(itemId));
-        hintRepository.deleteAllInBatch(hintRepository.findByItemIdOrderByOrderIndexAsc(itemId));
-        testCaseRepository.deleteAllInBatch(testCaseRepository.findByItemIdOrderByOrderIndexAsc(itemId));
-        optionRepository.deleteAllInBatch(optionRepository.findByItemIdOrderByOrderIndexAsc(itemId));
+        contentBlockRepository.deleteByItemId(itemId);
+        hintRepository.deleteByItemId(itemId);
+        testCaseRepository.deleteByItemId(itemId);
+        optionRepository.deleteByItemId(itemId);
     }
 
     private CourseItemContentBlock toContentBlock(CourseItem item, ContentBlockRequest request) {
