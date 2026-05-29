@@ -115,6 +115,17 @@ This endpoint is trusted backend-only and can include:
 
 LearningService should send the execution input to CodeExecutorService and then compare the executor output with expected outputs from this package.
 
+## Quiz Evaluation Package
+
+When a student submits a quiz answer, LearningService can request:
+
+```http
+GET /api/v1/internal/course-items/{itemId}/quiz-evaluation-package
+X-Internal-Api-Key: <secret>
+```
+
+This endpoint is trusted backend-only and returns quiz options with `correct` flags and explanations. It returns `400 Bad Request` for non-`QUIZ` items. LearningService should use this package to evaluate submitted `selectedOptionIds`; BFF and Site must continue to use learner-safe content that does not include `correct` or `explanation`.
+
 ## LearningService Owns
 
 LearningService stores:

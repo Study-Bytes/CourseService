@@ -22,6 +22,7 @@ import org.studyplatform.courseservice.dto.internal.ExecutionPackageResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseAvailabilityResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseItemContentResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseOwnershipResponse;
+import org.studyplatform.courseservice.dto.internal.QuizEvaluationPackageResponse;
 import org.studyplatform.courseservice.service.CourseInternalService;
 
 @RestController
@@ -54,6 +55,30 @@ public class InternalCourseController {
         return ResponseEntity.ok(courseInternalService.getExecutionPackage(itemId));
     }
 
+    @Operation(
+            summary = "Get quiz evaluation package",
+            description = "Returns quiz options with correct flags for trusted LearningService evaluation. Intended only for trusted backend services."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Quiz evaluation package returned",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = QuizEvaluationPackageResponse.class)
+                    )
+            ),
+            @ApiResponse(responseCode = "400", description = "Course item is not a quiz", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid internal API key", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Course item not found", content = @Content)
+    })
+    @GetMapping("/course-items/{itemId}/quiz-evaluation-package")
+    public ResponseEntity<QuizEvaluationPackageResponse> getQuizEvaluationPackage(
+            @Parameter(description = "Course item id", example = "8")
+            @PathVariable @Min(1) Long itemId
+    ) {
+        return ResponseEntity.ok(courseInternalService.getQuizEvaluationPackage(itemId));
+    }
 
     @Operation(
             summary = "Get enrolled-student-safe course item content",

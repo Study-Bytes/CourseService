@@ -7,6 +7,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.studyplatform.courseservice.dto.internal.ExecutionPackageResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseItemContentResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseOwnershipResponse;
+import org.studyplatform.courseservice.dto.internal.QuizEvaluationPackageResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemOptionResponse;
 import org.studyplatform.courseservice.dto.publicapi.OpenTestCaseResponse;
 import org.studyplatform.courseservice.entity.Course;
@@ -16,8 +17,10 @@ import org.studyplatform.courseservice.entity.CourseItemOption;
 import org.studyplatform.courseservice.entity.CourseItemTestCase;
 import org.studyplatform.courseservice.entity.CourseModule;
 import org.studyplatform.courseservice.entity.enums.CourseAccessType;
+import org.studyplatform.courseservice.entity.enums.CourseItemType;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
 import org.studyplatform.courseservice.entity.enums.TestVisibility;
+import org.studyplatform.courseservice.exception.BadRequestException;
 import org.studyplatform.courseservice.exception.ResourceNotFoundException;
 import org.studyplatform.courseservice.repository.CourseItemContentBlockRepository;
 import org.studyplatform.courseservice.repository.CourseItemHintRepository;
@@ -38,6 +41,7 @@ import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.cod
 import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.course;
 import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.module;
 import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.option;
+import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.quizItem;
 import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.testCase;
 import static org.studyplatform.courseservice.testsupport.CourseTestFixtures.textBlock;
 
@@ -110,6 +114,44 @@ class CourseInternalServiceUnitTest {
     }
 
     @Test
+    void quizEvaluationPackageShouldExposeCorrectFlagsForTrustedService() {
+        SeededQuizItem seeded = seededQuizItem();
+        CourseInternalService service = service();
+
+        when(itemRepository.findById(seeded.item().getId())).thenReturn(Optional.of(seeded.item()));
+        when(optionRepository.findByItemIdOrderByOrderIndexAsc(seeded.item().getId()))
+                .thenReturn(List.of(seeded.correctOption(), seeded.incorrectOption()));
+
+        QuizEvaluationPackageResponse response = service.getQuizEvaluationPackage(seeded.item().getId());
+
+        assertEquals(seeded.item().getId(), response.itemId());
+        assertEquals(seeded.item().getModule().getId(), response.moduleId());
+        assertEquals(seeded.item().getModule().getCourse().getId(), response.courseId());
+        assertEquals(CourseItemType.QUIZ, response.itemType());
+        assertEquals("Internal quiz", response.title());
+        assertEquals(2, response.options().size());
+        assertEquals(seeded.correctOption().getId(), response.options().getFirst().id());
+        assertEquals(true, response.options().getFirst().correct());
+        assertEquals("Correct explanation", response.options().getFirst().explanation());
+        assertEquals(false, response.options().get(1).correct());
+    }
+
+    @Test
+    void quizEvaluationPackageShouldRejectNonQuizItems() {
+        SeededItem seeded = seededCodingItem();
+        CourseInternalService service = service();
+
+        when(itemRepository.findById(seeded.item().getId())).thenReturn(Optional.of(seeded.item()));
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> service.getQuizEvaluationPackage(seeded.item().getId())
+        );
+
+        assertEquals("Course item is not a QUIZ: 3", exception.getMessage());
+    }
+
+    @Test
     void ownershipShouldCompareCourseAuthorWithUserId() {
         CourseInternalService service = service();
 
@@ -176,6 +218,25 @@ class CourseInternalServiceUnitTest {
         return new SeededItem(item, block, openTest, hiddenTest, correctOption);
     }
 
+    private SeededQuizItem seededQuizItem() {
+        Course course = course("internal-service-quiz-course", 1L, CourseStatus.PUBLISHED, CourseAccessType.PUBLIC);
+        course.setId(10L);
+
+        CourseModule module = module(course, "Internal quiz module", 0);
+        module.setId(11L);
+
+        CourseItem item = quizItem(module, "Internal quiz", 0);
+        item.setId(12L);
+
+        CourseItemOption correctOption = option(item, 0, "A", "x = 1", true);
+        correctOption.setId(13L);
+
+        CourseItemOption incorrectOption = option(item, 1, "B", "int x = 1", false);
+        incorrectOption.setId(14L);
+
+        return new SeededQuizItem(item, correctOption, incorrectOption);
+    }
+
     private void assertRecordDoesNotExpose(Class<?> recordType, String... componentNames) {
         List<String> exposedComponents = Arrays.stream(recordType.getRecordComponents())
                 .map(component -> component.getName())
@@ -192,6 +253,13 @@ class CourseInternalServiceUnitTest {
             CourseItemTestCase openTest,
             CourseItemTestCase hiddenTest,
             CourseItemOption correctOption
+    ) {
+    }
+
+    private record SeededQuizItem(
+            CourseItem item,
+            CourseItemOption correctOption,
+            CourseItemOption incorrectOption
     ) {
     }
 }

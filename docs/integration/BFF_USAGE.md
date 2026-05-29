@@ -134,3 +134,13 @@ GET /api/v1/internal/course-items/{itemId}/execution-package
 ```
 
 This endpoint can include hidden tests and expected output. It is for LearningService execution/evaluation flows only.
+
+## Quiz Evaluation Package Rule
+
+BFF must not return quiz evaluation package data to the frontend.
+
+```http
+GET /api/v1/internal/course-items/{itemId}/quiz-evaluation-package
+```
+
+This endpoint can include correct quiz flags and explanations. It is for LearningService quiz evaluation flows only.

@@ -7,6 +7,7 @@ import org.studyplatform.courseservice.dto.internal.InternalCourseAvailabilityRe
 import org.studyplatform.courseservice.dto.internal.InternalCourseItemContentResponse;
 import org.studyplatform.courseservice.dto.internal.InternalCourseOwnershipResponse;
 import org.studyplatform.courseservice.dto.internal.InternalTestCaseResponse;
+import org.studyplatform.courseservice.dto.internal.QuizEvaluationPackageResponse;
 import org.studyplatform.courseservice.dto.publicapi.ContentBlockResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemHintResponse;
 import org.studyplatform.courseservice.dto.publicapi.CourseItemLimitsResponse;
@@ -21,8 +22,10 @@ import org.studyplatform.courseservice.entity.CourseItemHint;
 import org.studyplatform.courseservice.entity.CourseItemOption;
 import org.studyplatform.courseservice.entity.CourseItemTestCase;
 import org.studyplatform.courseservice.entity.enums.CourseAccessType;
+import org.studyplatform.courseservice.entity.enums.CourseItemType;
 import org.studyplatform.courseservice.entity.enums.TestVisibility;
 import org.studyplatform.courseservice.entity.enums.CourseStatus;
+import org.studyplatform.courseservice.exception.BadRequestException;
 import org.studyplatform.courseservice.exception.ResourceNotFoundException;
 import org.studyplatform.courseservice.repository.CourseItemContentBlockRepository;
 import org.studyplatform.courseservice.repository.CourseItemHintRepository;
@@ -94,6 +97,31 @@ public class CourseInternalService {
                         item.getTrimTrailingWhitespaces()
                 ),
                 tests
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public QuizEvaluationPackageResponse getQuizEvaluationPackage(Long itemId) {
+        CourseItem item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course item not found: " + itemId));
+
+        if (item.getItemType() != CourseItemType.QUIZ) {
+            throw new BadRequestException("Course item is not a QUIZ: " + itemId);
+        }
+
+        Course course = item.getModule().getCourse();
+        List<QuizEvaluationPackageResponse.QuizEvaluationOptionResponse> options = optionRepository.findByItemIdOrderByOrderIndexAsc(itemId)
+                .stream()
+                .map(this::toQuizEvaluationOption)
+                .toList();
+
+        return new QuizEvaluationPackageResponse(
+                item.getId(),
+                item.getModule().getId(),
+                course.getId(),
+                item.getItemType(),
+                item.getTitle(),
+                options
         );
     }
 
@@ -213,6 +241,17 @@ public class CourseInternalService {
                 option.getOrderIndex(),
                 option.getLabel(),
                 option.getText()
+        );
+    }
+
+    private QuizEvaluationPackageResponse.QuizEvaluationOptionResponse toQuizEvaluationOption(CourseItemOption option) {
+        return new QuizEvaluationPackageResponse.QuizEvaluationOptionResponse(
+                option.getId(),
+                option.getOrderIndex(),
+                option.getLabel(),
+                option.getText(),
+                option.getCorrect(),
+                option.getExplanation()
         );
     }
 

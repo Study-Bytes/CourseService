@@ -284,6 +284,22 @@ This endpoint is for `LearningService` only. It is used when a student runs or s
 `CodeExecutorService` still does not compare answers; it only executes code and returns technical output.
 `LearningService` should compare executor output with the expected outputs from this package.
 
+### Quiz evaluation package
+
+```http
+GET /api/v1/internal/course-items/{itemId}/quiz-evaluation-package
+```
+
+This endpoint returns trusted quiz data for `LearningService` answer checks:
+
+- course/module/item identifiers;
+- item type and title;
+- quiz options;
+- correct flags;
+- option explanations.
+
+It returns `400 Bad Request` when the item is not a `QUIZ`. This endpoint is for `LearningService` only and must not be exposed to Site or BFF responses. Student-safe content endpoints continue to hide correct quiz answers and explanations.
+
 ### Course availability
 
 ```http

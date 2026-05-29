@@ -22,6 +22,7 @@ CourseService owns course structure and author-created content. LearningService 
 | Internal ownership | `GET /api/v1/internal/courses/{courseId}/ownership?userId={userId}` | LearningService | `X-Internal-Api-Key` | Check whether a user is the course author | Do not expose directly |
 | Internal content | `GET /api/v1/internal/course-items/{itemId}/content` | BFF/LearningService after enrollment check | `X-Internal-Api-Key` | Return student-safe full item content after LearningService decides access | May be transformed by BFF for enrolled student views |
 | Execution package | `GET /api/v1/internal/course-items/{itemId}/execution-package` | LearningService only | `X-Internal-Api-Key` | Return execution limits, policies, hidden tests and expected outputs | Never expose to frontend |
+| Quiz evaluation package | `GET /api/v1/internal/course-items/{itemId}/quiz-evaluation-package` | LearningService only | `X-Internal-Api-Key` | Return quiz options with correct flags for backend evaluation | Never expose to frontend |
 
 ## Access Boundaries
 
@@ -31,6 +32,7 @@ CourseService owns course structure and author-created content. LearningService 
 - `LearningService` decides enrollment, attempt rules and progress.
 - `LearningService` calls CourseService internal endpoints only after its own business checks.
 - `execution-package` is only for backend evaluation flow and must not be returned to Site.
+- `quiz-evaluation-package` is only for backend quiz checks and must not be returned to Site.
 
 ## Sensitive Data Rules
 
@@ -45,6 +47,8 @@ Public endpoints must not expose:
 Internal content may expose student-safe full content, but not hidden tests or expected outputs.
 
 Execution package may expose hidden tests and expected outputs only to LearningService.
+
+Quiz evaluation package may expose correct quiz flags and explanations only to LearningService.
 
 
 ## Admin editor additions
